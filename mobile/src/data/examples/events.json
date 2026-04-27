@@ -1,0 +1,237 @@
+{
+  "events": [
+    {
+      "id": "TORRE-145-2026-04-18",
+      "name": "Boda TORRE",
+      "date": "2026-04-18",
+      "pax": 145,
+      "openDoorsTime": "12:15",
+      "endTime": "22:40",
+      "ceremony": {
+        "enabled": true,
+        "start": "13:00",
+        "end": "13:45",
+        "displacementAfterMinutes": 15,
+        "civil": true,
+        "limonada": true,
+        "beerStand": false
+      },
+      "cocktail": {
+        "enabled": true,
+        "start": "14:00",
+        "end": "15:00",
+        "displacementAfterMinutes": 15,
+        "stands": [
+          "jamon_1x50",
+          "quesos_clasico"
+        ]
+      },
+      "banquet": {
+        "enabled": true,
+        "start": "15:15",
+        "end": "17:15",
+        "segments": [
+          {
+            "name": "primero",
+            "minutes": 30
+          },
+          {
+            "name": "sorbete",
+            "minutes": 20
+          },
+          {
+            "name": "segundo",
+            "minutes": 30
+          },
+          {
+            "name": "postre",
+            "minutes": 30
+          },
+          {
+            "name": "cafe",
+            "minutes": 30
+          }
+        ],
+        "cake": false,
+        "momentsExtraMinutes": 0,
+        "displacementAfterMinutes": 15
+      },
+      "party": {
+        "enabled": true,
+        "segments": [
+          {
+            "name": "tardeo",
+            "start": "17:40",
+            "end": "19:10"
+          },
+          {
+            "name": "dj",
+            "start": "19:10",
+            "end": "22:40"
+          }
+        ],
+        "totalMinutes": 300
+      },
+      "resopon": {
+        "enabled": true,
+        "type": "tradicional",
+        "serviceWindow": [
+          "21:45",
+          "21:45"
+        ]
+      }
+    },
+    {
+      "id": "HUERTA-114-2026-04-26",
+      "name": "Boda HUERTA",
+      "date": "2026-04-26",
+      "pax": 114,
+      "openDoorsTime": "13:15",
+      "endTime": "21:15",
+      "ceremony": {
+        "enabled": false
+      },
+      "cocktail": {
+        "enabled": true,
+        "start": "13:45",
+        "end": "14:45",
+        "sorbeteBridgeMinutes": 10,
+        "displacementAfterMinutes": 15,
+        "stands": [
+          "jamon_1x50",
+          "quesos_clasico"
+        ]
+      },
+      "banquet": {
+        "enabled": true,
+        "start": "15:00",
+        "end": "17:00",
+        "segments": [
+          {
+            "name": "primero",
+            "minutes": 30
+          },
+          {
+            "name": "sorbete",
+            "minutes": 20
+          },
+          {
+            "name": "segundo",
+            "minutes": 30
+          },
+          {
+            "name": "postre",
+            "minutes": 30
+          },
+          {
+            "name": "cafe",
+            "minutes": 30
+          }
+        ],
+        "cake": false,
+        "momentsExtraMinutes": 0,
+        "displacementAfterMinutes": 15
+      },
+      "party": {
+        "enabled": true,
+        "segments": [
+          {
+            "name": "dj",
+            "start": "17:25",
+            "end": "21:25"
+          }
+        ],
+        "totalMinutes": 240
+      },
+      "resopon": {
+        "enabled": true,
+        "type": "tradicional",
+        "serviceWindow": [
+          "20:30",
+          "21:00"
+        ]
+      }
+    },
+    {
+      "id": "GENERIC-145-2026",
+      "name": "Evento ejemplo con cerveza y croquetas",
+      "date": "2026-04-01",
+      "pax": 145,
+      "openDoorsTime": "12:15",
+      "ceremony": {
+        "enabled": true,
+        "start": "13:00",
+        "end": "13:45",
+        "displacementAfterMinutes": 15,
+        "civil": true,
+        "limonada": true,
+        "beerStand": true
+      },
+      "cocktail": {
+        "enabled": true,
+        "start": "14:00",
+        "end": "15:00",
+        "displacementAfterMinutes": 15,
+        "stands": [
+          "jamon_1x50",
+          "quesos_clasico",
+          "croquetas"
+        ]
+      },
+      "banquet": {
+        "enabled": true,
+        "start": "15:15",
+        "end": "17:15",
+        "segments": [
+          {
+            "name": "primero",
+            "minutes": 30
+          },
+          {
+            "name": "sorbete",
+            "minutes": 20
+          },
+          {
+            "name": "segundo",
+            "minutes": 30
+          },
+          {
+            "name": "postre",
+            "minutes": 30
+          },
+          {
+            "name": "cafe",
+            "minutes": 30
+          }
+        ],
+        "cake": false,
+        "momentsExtraMinutes": 10,
+        "displacementAfterMinutes": 15
+      },
+      "party": {
+        "enabled": true,
+        "segments": [
+          {
+            "name": "tardeo",
+            "start": "17:50",
+            "end": "19:30"
+          },
+          {
+            "name": "dj",
+            "start": "19:30",
+            "end": "00:00"
+          }
+        ],
+        "totalMinutes": 360
+      },
+      "resopon": {
+        "enabled": true,
+        "type": "tradicional",
+        "serviceWindow": [
+          "22:30",
+          "22:30"
+        ]
+      }
+    }
+  ]
+}

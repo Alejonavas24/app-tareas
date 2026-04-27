@@ -1,0 +1,14 @@
+grant usage on schema logistica_tareas to anon, authenticated, service_role;
+grant usage on type logistica_tareas.espacio_rol to anon, authenticated, service_role;
+grant usage on type logistica_tareas.conteo_inventario_estado to anon, authenticated, service_role;
+grant usage on type logistica_tareas.tarea_estado to anon, authenticated, service_role;
+grant usage on type logistica_tareas.tarea_estado_carga to anon, authenticated, service_role;
+grant execute on function logistica_tareas.list_inventory_spaces() to anon, authenticated, service_role;
+grant execute on function logistica_tareas.list_space_inventory_rows(bigint, text, text) to anon, authenticated, service_role;
+grant execute on function logistica_tareas.submit_space_inventory_count(bigint, text, jsonb) to anon, authenticated, service_role;
+grant execute on function logistica_tareas.list_available_transport_tasks(date, date) to anon, authenticated, service_role;
+grant execute on function logistica_tareas.list_driver_transport_tasks(text, boolean, date, date) to anon, authenticated, service_role;
+grant execute on function logistica_tareas.assign_task_driver(bigint, text, text) to anon, authenticated, service_role;
+grant execute on function logistica_tareas.unassign_task_driver(bigint, text) to anon, authenticated, service_role;
+grant execute on function logistica_tareas.save_task_loading_draft(bigint, integer, text) to anon, authenticated, service_role;
+grant execute on function logistica_tareas.finalize_task_loading(bigint, integer, logistica_tareas.tarea_estado_carga, text) to anon, authenticated, service_role;
