@@ -4,14 +4,9 @@ import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import type { RootStackParamList } from "./src/navigation/types";
 import { ConfiguratorScreen } from "./src/screens/ConfiguratorScreen";
-import { AssumptionsScreen } from "./src/screens/AssumptionsScreen";
-import { BaseEventScreen } from "./src/screens/BaseEventScreen";
-import { BlocksScreen } from "./src/screens/BlocksScreen";
-import { EventListScreen } from "./src/screens/EventListScreen";
-import { ModulesScreen } from "./src/screens/ModulesScreen";
-import { ScheduleScreen } from "./src/screens/ScheduleScreen";
 import { TimelineScreen } from "./src/screens/TimelineScreen";
 import { colors } from "./src/theme/tokens";
 
@@ -45,26 +40,22 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer theme={navigationTheme}>
-        <StatusBar style="dark" />
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.canvas },
-          }}
-        >
-          <Stack.Screen name="Configurator" component={ConfiguratorScreen} />
-          <Stack.Screen name="Events" component={EventListScreen} />
-          <Stack.Screen name="BaseEvent" component={BaseEventScreen} />
-          <Stack.Screen name="Modules" component={ModulesScreen} />
-          <Stack.Screen name="Schedule" component={ScheduleScreen} />
-          <Stack.Screen name="Timeline" component={TimelineScreen} />
-          <Stack.Screen name="Blocks" component={BlocksScreen} />
-          <Stack.Screen name="Assumptions" component={AssumptionsScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <AppErrorBoundary>
+      <SafeAreaProvider>
+        <NavigationContainer theme={navigationTheme}>
+          <StatusBar style="dark" />
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.canvas },
+            }}
+          >
+            <Stack.Screen name="Configurator" component={ConfiguratorScreen} />
+            <Stack.Screen name="Timeline" component={TimelineScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </AppErrorBoundary>
   );
 }
 

@@ -205,7 +205,7 @@
           }
         ],
         "cake": false,
-        "momentsExtraMinutes": 10,
+        "momentsExtraMinutes": 0,
         "displacementAfterMinutes": 15
       },
       "party": {

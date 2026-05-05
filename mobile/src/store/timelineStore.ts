@@ -1,10 +1,12 @@
 import { create } from "zustand";
-import { duplicateEventConfig, normalizeEventConfig } from "../domain/defaults";
+import { fallbackEventCatalog } from "../data/catalog";
+import { applyOperationalSchedule, duplicateEventConfig } from "../domain/defaults";
 import { generateTimeline } from "../domain/timelineEngine";
-import type { EventConfig, TimelineEventSummary, TimelineResult, TimelineSnapshot } from "../domain/types";
+import type { EventCatalog, EventConfig, TimelineEventSummary, TimelineResult, TimelineSnapshot } from "../domain/types";
 import { exampleEvents } from "../data/examples";
 import {
   deleteTimelineEvent,
+  getEventCatalog,
   getTimelineEvent,
   listTimelineEvents,
   markAssumptionReviewed,
@@ -15,10 +17,13 @@ interface TimelineState {
   events: TimelineEventSummary[];
   draft?: EventConfig;
   result?: TimelineResult;
+  catalog: EventCatalog;
+  catalogSource: "fallback" | "supabase";
   dbId?: string;
   loading: boolean;
   saving: boolean;
   error?: string;
+  loadCatalog: () => Promise<void>;
   loadEvents: () => Promise<void>;
   createDraft: () => void;
   openExample: (index: number) => void;
@@ -51,10 +56,35 @@ function resultFromSnapshot(snapshot: TimelineSnapshot): TimelineResult {
   };
 }
 
+function generateWithCatalog(draft: EventConfig, catalog: EventCatalog): TimelineResult {
+  return generateTimeline(draft, catalog);
+}
+
 export const useTimelineStore = create<TimelineState>((set, get) => ({
   events: [],
+  catalog: fallbackEventCatalog,
+  catalogSource: "fallback",
   loading: false,
   saving: false,
+
+  async loadCatalog() {
+    try {
+      const catalog = await getEventCatalog(get().draft?.pax);
+      const draft = get().draft;
+      set({
+        catalog,
+        catalogSource: "supabase",
+        result: draft ? generateWithCatalog(draft, catalog) : get().result,
+      });
+    } catch {
+      const draft = get().draft;
+      set({
+        catalog: fallbackEventCatalog,
+        catalogSource: "fallback",
+        result: draft ? generateWithCatalog(draft, fallbackEventCatalog) : get().result,
+      });
+    }
+  },
 
   async loadEvents() {
     set({ loading: true, error: undefined });
@@ -67,15 +97,15 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
   },
 
   createDraft() {
-    const draft = normalizeEventConfig({} as EventConfig);
-    const result = generateTimeline(draft);
+    const draft = applyOperationalSchedule({} as EventConfig);
+    const result = generateWithCatalog(draft, get().catalog);
     set({ draft, result, dbId: undefined, error: undefined });
   },
 
   openExample(index: number) {
     const source = exampleEvents[index] ?? exampleEvents[0];
-    const draft = normalizeEventConfig({ ...source, id: `${source.id}-${Date.now().toString(36)}` });
-    const result = generateTimeline(draft);
+    const draft = applyOperationalSchedule({ ...source, id: `${source.id}-${Date.now().toString(36)}` });
+    const result = generateWithCatalog(draft, get().catalog);
     set({ draft, result, dbId: undefined, error: undefined });
   },
 
@@ -83,8 +113,8 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     set({ loading: true, error: undefined });
     try {
       const snapshot = await getTimelineEvent(dbId);
-      const draft = normalizeEventConfig(snapshot.eventConfig);
-      const result = snapshot.blocks?.length ? resultFromSnapshot(snapshot) : generateTimeline(draft);
+      const draft = applyOperationalSchedule(snapshot.eventConfig);
+      const result = snapshot.blocks?.length ? resultFromSnapshot(snapshot) : generateWithCatalog(draft, get().catalog);
       set({ draft, result, dbId: snapshot.dbId ?? dbId, loading: false });
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
@@ -97,7 +127,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
       return;
     }
     const duplicated = duplicateEventConfig(draft);
-    set({ draft: duplicated, result: generateTimeline(duplicated), dbId: undefined, error: undefined });
+    set({ draft: duplicated, result: generateWithCatalog(duplicated, get().catalog), dbId: undefined, error: undefined });
   },
 
   async deleteEvent(dbId: string) {
@@ -118,8 +148,8 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     if (!current) {
       return;
     }
-    const draft = normalizeEventConfig(updater(current));
-    set({ draft, result: generateTimeline(draft), error: undefined });
+    const draft = applyOperationalSchedule(updater(current));
+    set({ draft, result: generateWithCatalog(draft, get().catalog), error: undefined });
   },
 
   regenerate() {
@@ -127,7 +157,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     if (!draft) {
       return undefined;
     }
-    const result = generateTimeline(draft);
+    const result = generateWithCatalog(draft, get().catalog);
     set({ result });
     return result;
   },
@@ -137,11 +167,11 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     if (!draft) {
       return undefined;
     }
-    const freshResult = result ?? generateTimeline(draft);
+    const freshResult = result ?? generateWithCatalog(draft, get().catalog);
     set({ saving: true, error: undefined });
     try {
       const saved = await saveTimelineSnapshot(buildSnapshot(draft, freshResult, dbId));
-      const normalizedDraft = normalizeEventConfig(saved.eventConfig);
+      const normalizedDraft = applyOperationalSchedule(saved.eventConfig);
       set({
         dbId: saved.dbId,
         draft: normalizedDraft,
@@ -178,7 +208,7 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
       const snapshot = await markAssumptionReviewed(dbId, assumptionId, reviewed);
       set({
         result: resultFromSnapshot(snapshot),
-        draft: normalizeEventConfig(snapshot.eventConfig),
+        draft: applyOperationalSchedule(snapshot.eventConfig),
         saving: false,
       });
     } catch (error) {
@@ -190,4 +220,3 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     set({ error: undefined });
   },
 }));
-

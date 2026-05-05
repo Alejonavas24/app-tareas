@@ -1,12 +1,13 @@
 import { useEffect } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Field, ToggleRow } from "../components/Field";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
-import { addMinutes } from "../domain/time";
-import type { EventConfig } from "../domain/types";
+import { TimeSelect } from "../components/TimeSelect";
+import { BANQUET_SEGMENT_OPTIONS, buildBanquetSegments } from "../domain/defaults";
+import type { BanquetSegmentName, EventStand, StandMoment } from "../domain/types";
 import type { RootStackParamList } from "../navigation/types";
 import { useTimelineStore } from "../store/timelineStore";
 import { colors, spacing } from "../theme/tokens";
@@ -17,24 +18,29 @@ const STAND_OPTIONS = [
   { id: "jamon_1x50", label: "Jamon" },
   { id: "quesos_clasico", label: "Quesos" },
   { id: "croquetas", label: "Croquetas" },
+  { id: "cerveza", label: "Cerveza" },
+] satisfies { id: EventStand["id"]; label: string }[];
+
+const STAND_MOMENTS: { id: StandMoment; label: string }[] = [
+  { id: "ceremony", label: "Ceremonia" },
+  { id: "cocktail", label: "Coctel" },
+  { id: "party", label: "Fiesta" },
 ];
 
-function banquetDuration(event: EventConfig): number {
-  return event.banquet.segments.reduce((sum, segment) => sum + segment.minutes, 0) + (event.banquet.momentsExtraMinutes ?? 0);
-}
-
-function partyDuration(event: EventConfig): number {
-  return event.party.totalMinutes ?? 300;
-}
-
 export function ConfiguratorScreen({ navigation }: Props) {
-  const { draft, createDraft, updateDraft, regenerate, result } = useTimelineStore();
+  const { draft, createDraft, updateDraft, regenerate, result, loadCatalog, catalogSource } = useTimelineStore();
 
   useEffect(() => {
     if (!draft) {
       createDraft();
     }
   }, [createDraft, draft]);
+
+  useEffect(() => {
+    if (draft) {
+      void loadCatalog();
+    }
+  }, [draft?.id, loadCatalog]);
 
   if (!draft) {
     return (
@@ -44,73 +50,27 @@ export function ConfiguratorScreen({ navigation }: Props) {
     );
   }
 
-  const setCeremonyStart = (start: string) =>
-    updateDraft((event) => ({
-      ...event,
-      ceremony: {
-        ...event.ceremony,
-        start,
-        end: addMinutes(start, 45),
-      },
-    }));
-
-  const setCocktailStart = (start: string) =>
-    updateDraft((event) => ({
-      ...event,
-      cocktail: {
-        ...event.cocktail,
-        start,
-        end: addMinutes(start, 60),
-      },
-    }));
-
-  const setBanquetStart = (start: string) =>
-    updateDraft((event) => ({
-      ...event,
-      banquet: {
-        ...event.banquet,
-        start,
-        end: addMinutes(start, banquetDuration(event)),
-      },
-    }));
-
-  const setPartyStart = (start: string) =>
-    updateDraft((event) => ({
-      ...event,
-      party: {
-        ...event.party,
-        segments: [
-          {
-            name: event.party.segments[0]?.name ?? "fiesta",
-            start,
-            end: addMinutes(start, partyDuration(event)),
-          },
-        ],
-      },
-    }));
-
-  const setResoponStart = (start: string) =>
-    updateDraft((event) => ({
-      ...event,
-      resopon: {
-        ...event.resopon,
-        serviceWindow: [start, start],
-      },
-    }));
-
-  const toggleStand = (standId: string, enabled: boolean) =>
+  const updateStand = (standId: EventStand["id"], patch: Partial<Pick<EventStand, "enabled" | "moment">>) =>
     updateDraft((event) => {
-      const current = new Set(event.cocktail.stands);
+      return {
+        ...event,
+        stands: event.stands.map((stand) => (stand.id === standId ? { ...stand, ...patch } : stand)),
+      };
+    });
+
+  const toggleBanquetSegment = (name: BanquetSegmentName, enabled: boolean) =>
+    updateDraft((event) => {
+      const active = new Set(event.banquet.segments.map((segment) => segment.name));
       if (enabled) {
-        current.add(standId);
+        active.add(name);
       } else {
-        current.delete(standId);
+        active.delete(name);
       }
       return {
         ...event,
-        cocktail: {
-          ...event.cocktail,
-          stands: Array.from(current),
+        banquet: {
+          ...event.banquet,
+          segments: buildBanquetSegments(Array.from(active), event.pax),
         },
       };
     });
@@ -118,7 +78,7 @@ export function ConfiguratorScreen({ navigation }: Props) {
   return (
     <Screen
       title="Momentos de la boda"
-      subtitle="Activa los momentos, pon la hora de inicio y genera el Gantt."
+      subtitle="Activa los momentos, pon la hora inicial y genera el Gantt."
       footer={
         <View style={styles.footer}>
           <PrimaryButton
@@ -150,14 +110,27 @@ export function ConfiguratorScreen({ navigation }: Props) {
               label="Pax"
               value={String(draft.pax)}
               keyboardType="numeric"
-              onChangeText={(pax) => updateDraft((event) => ({ ...event, pax: Number(pax) || 1 }))}
+              onChangeText={(pax) => {
+                const nextPax = Number(pax) || 1;
+                updateDraft((event) => ({
+                  ...event,
+                  pax: nextPax,
+                  banquet: {
+                    ...event.banquet,
+                    segments: buildBanquetSegments(
+                      event.banquet.segments.map((segment) => segment.name),
+                      nextPax,
+                    ),
+                  },
+                }));
+              }}
             />
           </View>
         </View>
-        <Field
-          label="Apertura de puertas"
+        <TimeSelect
+          label="Inicio operativo"
           value={draft.openDoorsTime}
-          onChangeText={(openDoorsTime) => updateDraft((event) => ({ ...event, openDoorsTime }))}
+          onValueChange={(openDoorsTime) => updateDraft((event) => ({ ...event, openDoorsTime }))}
         />
       </SectionCard>
 
@@ -165,66 +138,73 @@ export function ConfiguratorScreen({ navigation }: Props) {
         <MomentRow
           label="Ceremonia civil"
           enabled={draft.ceremony.enabled}
-          start={draft.ceremony.start ?? ""}
+          caption={`${draft.ceremony.start ?? "--"} - ${draft.ceremony.end ?? "--"}`}
           onToggle={(enabled) => updateDraft((event) => ({ ...event, ceremony: { ...event.ceremony, enabled } }))}
-          onStartChange={setCeremonyStart}
         />
         <MomentRow
           label="Puesto de limonada"
           enabled={Boolean(draft.ceremony.limonada)}
-          start={draft.ceremony.start ?? ""}
+          caption={`${draft.ceremony.start ?? "--"} - ${draft.ceremony.end ?? "--"}`}
           onToggle={(limonada) => updateDraft((event) => ({ ...event, ceremony: { ...event.ceremony, limonada } }))}
-          onStartChange={setCeremonyStart}
         />
         <MomentRow
           label="Coctel"
           enabled={draft.cocktail.enabled}
-          start={draft.cocktail.start ?? ""}
+          caption={`${draft.cocktail.start ?? "--"} - ${draft.cocktail.end ?? "--"}`}
           onToggle={(enabled) => updateDraft((event) => ({ ...event, cocktail: { ...event.cocktail, enabled } }))}
-          onStartChange={setCocktailStart}
         />
         <MomentRow
           label="Banquete"
           enabled={draft.banquet.enabled}
-          start={draft.banquet.start ?? ""}
+          caption={`${draft.banquet.start ?? "--"} - ${draft.banquet.end ?? "--"} declarado`}
           onToggle={(enabled) => updateDraft((event) => ({ ...event, banquet: { ...event.banquet, enabled } }))}
-          onStartChange={setBanquetStart}
         />
         <MomentRow
           label="Fiesta"
           enabled={draft.party.enabled}
-          start={draft.party.segments[0]?.start ?? ""}
+          caption={`${draft.party.segments[0]?.start ?? "--"} - ${draft.party.segments[draft.party.segments.length - 1]?.end ?? "--"}`}
           onToggle={(enabled) => updateDraft((event) => ({ ...event, party: { ...event.party, enabled } }))}
-          onStartChange={setPartyStart}
         />
         <MomentRow
           label="Resopon"
           enabled={draft.resopon.enabled}
-          start={draft.resopon.serviceWindow?.[0] ?? ""}
+          caption={`Servicio ${draft.resopon.serviceWindow?.[0] ?? "--"}`}
           onToggle={(enabled) => updateDraft((event) => ({ ...event, resopon: { ...event.resopon, enabled } }))}
-          onStartChange={setResoponStart}
         />
       </SectionCard>
 
-      <SectionCard title="Puestos del coctel" caption="Solo si quieres incluirlos en el diagrama.">
-        <ToggleRow
-          label="Puesto cerveza"
-          value={Boolean(draft.ceremony.beerStand)}
-          onValueChange={(beerStand) =>
-            updateDraft((event) => ({ ...event, ceremony: { ...event.ceremony, beerStand } }))
-          }
-        />
+      <SectionCard title="Puestos" caption="Activa cada puesto y elige donde ocurre.">
         {STAND_OPTIONS.map((option) => (
-          <ToggleRow
+          <StandConfigRow
             key={option.id}
             label={option.label}
-            value={draft.cocktail.stands.includes(option.id)}
-            onValueChange={(enabled) => toggleStand(option.id, enabled)}
+            stand={draft.stands.find((stand) => stand.id === option.id)}
+            onToggle={(enabled) => updateStand(option.id, { enabled })}
+            onMoment={(moment) => updateStand(option.id, { moment })}
           />
         ))}
       </SectionCard>
 
-      <SectionCard title="Vista rapida">
+      <SectionCard
+        title="Banquete"
+        caption={`Cada segmento activo dura ${draft.pax > 200 ? 45 : 30} min.`}
+      >
+        {BANQUET_SEGMENT_OPTIONS.map((option) => (
+          <ToggleRow
+            key={option.name}
+            label={option.label}
+            value={draft.banquet.segments.some((segment) => segment.name === option.name)}
+            onValueChange={(enabled) => toggleBanquetSegment(option.name, enabled)}
+            caption={
+              draft.banquet.segments.some((segment) => segment.name === option.name)
+                ? `${draft.pax > 200 ? 45 : 30} min`
+                : undefined
+            }
+          />
+        ))}
+      </SectionCard>
+
+      <SectionCard title="Vista rapida" caption={`Catalogo: ${catalogSource === "supabase" ? "Supabase" : "local"}`}>
         <View style={styles.quickStats}>
           <QuickStat label="Bloques" value={String(result?.summary.totalBlocks ?? 0)} />
           <QuickStat label="Supuestos" value={String(result?.summary.assumptionCount ?? 0)} />
@@ -236,23 +216,62 @@ export function ConfiguratorScreen({ navigation }: Props) {
   );
 }
 
+function StandConfigRow({
+  label,
+  stand,
+  onToggle,
+  onMoment,
+}: {
+  label: string;
+  stand?: EventStand;
+  onToggle: (enabled: boolean) => void;
+  onMoment: (moment: StandMoment) => void;
+}) {
+  const enabled = Boolean(stand?.enabled);
+  const moment = stand?.moment ?? "cocktail";
+  return (
+    <View style={styles.standRow}>
+      <ToggleRow
+        label={label}
+        value={enabled}
+        onValueChange={onToggle}
+        caption={enabled ? STAND_MOMENTS.find((item) => item.id === moment)?.label : undefined}
+      />
+      {enabled ? (
+        <View style={styles.segmented}>
+          {STAND_MOMENTS.map((item) => {
+            const selected = item.id === moment;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                key={item.id}
+                onPress={() => onMoment(item.id)}
+                style={[styles.segmentButton, selected && styles.segmentButtonActive]}
+              >
+                <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>{item.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function MomentRow({
   label,
   enabled,
-  start,
+  caption,
   onToggle,
-  onStartChange,
 }: {
   label: string;
   enabled: boolean;
-  start: string;
+  caption: string;
   onToggle: (value: boolean) => void;
-  onStartChange: (value: string) => void;
 }) {
   return (
     <View style={styles.momentRow}>
-      <ToggleRow label={label} value={enabled} onValueChange={onToggle} />
-      {enabled ? <Field label="Hora inicio" value={start} onChangeText={onStartChange} /> : null}
+      <ToggleRow label={label} value={enabled} onValueChange={onToggle} caption={enabled ? caption : undefined} />
     </View>
   );
 }
@@ -284,6 +303,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.line,
   },
+  standRow: {
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
+  segmented: {
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    borderColor: colors.line,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+  },
+  segmentButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  segmentText: {
+    color: colors.text,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  segmentTextActive: {
+    color: colors.textStrong,
+  },
   quickStats: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -311,4 +362,3 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
 });
-

@@ -1,9 +1,10 @@
-import { Text, View, StyleSheet } from "react-native";
+import { Pressable, Text, View, StyleSheet } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ToggleRow } from "../components/Field";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
+import type { EventStand, StandMoment } from "../domain/types";
 import type { RootStackParamList } from "../navigation/types";
 import { useTimelineStore } from "../store/timelineStore";
 import { colors, spacing } from "../theme/tokens";
@@ -14,6 +15,13 @@ const standOptions = [
   { id: "jamon_1x50", label: "Jamon" },
   { id: "quesos_clasico", label: "Quesos clasico" },
   { id: "croquetas", label: "Croquetas" },
+  { id: "cerveza", label: "Cerveza" },
+] satisfies { id: EventStand["id"]; label: string }[];
+
+const standMoments: { id: StandMoment; label: string }[] = [
+  { id: "ceremony", label: "Ceremonia" },
+  { id: "cocktail", label: "Coctel" },
+  { id: "party", label: "Fiesta" },
 ];
 
 export function ModulesScreen({ navigation }: Props) {
@@ -27,17 +35,11 @@ export function ModulesScreen({ navigation }: Props) {
     );
   }
 
-  const updateStands = (standId: string, enabled: boolean) => {
-    updateDraft((event) => {
-      const current = new Set(event.cocktail.stands ?? []);
-      if (enabled) {
-        current.add(standId);
-      } else {
-        current.delete(standId);
-      }
-      return { ...event, cocktail: { ...event.cocktail, stands: Array.from(current) } };
-    });
-  };
+  const updateStand = (standId: EventStand["id"], patch: Partial<Pick<EventStand, "enabled" | "moment">>) =>
+    updateDraft((event) => ({
+      ...event,
+      stands: event.stands.map((stand) => (stand.id === standId ? { ...stand, ...patch } : stand)),
+    }));
 
   return (
     <Screen
@@ -63,13 +65,6 @@ export function ModulesScreen({ navigation }: Props) {
             updateDraft((event) => ({ ...event, ceremony: { ...event.ceremony, limonada } }))
           }
         />
-        <ToggleRow
-          label="Puesto cerveza"
-          value={Boolean(draft.ceremony.beerStand)}
-          onValueChange={(beerStand) =>
-            updateDraft((event) => ({ ...event, ceremony: { ...event.ceremony, beerStand } }))
-          }
-        />
       </SectionCard>
 
       <SectionCard title="Coctel y puestos">
@@ -79,11 +74,12 @@ export function ModulesScreen({ navigation }: Props) {
           onValueChange={(enabled) => updateDraft((event) => ({ ...event, cocktail: { ...event.cocktail, enabled } }))}
         />
         {standOptions.map((option) => (
-          <ToggleRow
+          <StandConfigRow
             key={option.id}
             label={option.label}
-            value={draft.cocktail.stands.includes(option.id)}
-            onValueChange={(enabled) => updateStands(option.id, enabled)}
+            stand={draft.stands.find((stand) => stand.id === option.id)}
+            onToggle={(enabled) => updateStand(option.id, { enabled })}
+            onMoment={(moment) => updateStand(option.id, { moment })}
           />
         ))}
       </SectionCard>
@@ -119,6 +115,48 @@ export function ModulesScreen({ navigation }: Props) {
   );
 }
 
+function StandConfigRow({
+  label,
+  stand,
+  onToggle,
+  onMoment,
+}: {
+  label: string;
+  stand?: EventStand;
+  onToggle: (enabled: boolean) => void;
+  onMoment: (moment: StandMoment) => void;
+}) {
+  const enabled = Boolean(stand?.enabled);
+  const moment = stand?.moment ?? "cocktail";
+  return (
+    <View style={styles.standRow}>
+      <ToggleRow
+        label={label}
+        value={enabled}
+        onValueChange={onToggle}
+        caption={enabled ? standMoments.find((item) => item.id === moment)?.label : undefined}
+      />
+      {enabled ? (
+        <View style={styles.segmented}>
+          {standMoments.map((item) => {
+            const selected = item.id === moment;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                key={item.id}
+                onPress={() => onMoment(item.id)}
+                style={[styles.segmentButton, selected && styles.segmentButtonActive]}
+              >
+                <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>{item.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   empty: {
     color: colors.textMuted,
@@ -134,5 +172,36 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
   },
+  standRow: {
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
+  segmented: {
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    borderColor: colors.line,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+  },
+  segmentButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  segmentText: {
+    color: colors.text,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  segmentTextActive: {
+    color: colors.textStrong,
+  },
 });
-

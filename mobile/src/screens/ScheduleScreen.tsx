@@ -4,6 +4,7 @@ import { Field, ToggleRow } from "../components/Field";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
+import { BANQUET_SEGMENT_OPTIONS, buildBanquetSegments } from "../domain/defaults";
 import type { RootStackParamList } from "../navigation/types";
 import { useTimelineStore } from "../store/timelineStore";
 import { colors, spacing } from "../theme/tokens";
@@ -85,22 +86,32 @@ export function ScheduleScreen({ navigation }: Props) {
             }))
           }
         />
-        {draft.banquet.segments.map((segment, index) => (
-          <Field
-            key={`${segment.name}-${index}`}
-            label={`Segmento ${segment.name}`}
-            value={String(segment.minutes)}
-            keyboardType="numeric"
-            onChangeText={(value) =>
-              updateDraft((event) => ({
-                ...event,
-                banquet: {
-                  ...event.banquet,
-                  segments: event.banquet.segments.map((item, itemIndex) =>
-                    itemIndex === index ? { ...item, minutes: Number(value) || 0 } : item,
-                  ),
-                },
-              }))
+        {BANQUET_SEGMENT_OPTIONS.map((option) => (
+          <ToggleRow
+            key={option.name}
+            label={option.label}
+            value={draft.banquet.segments.some((segment) => segment.name === option.name)}
+            caption={
+              draft.banquet.segments.some((segment) => segment.name === option.name)
+                ? `${draft.pax > 200 ? 45 : 30} min`
+                : undefined
+            }
+            onValueChange={(enabled) =>
+              updateDraft((event) => {
+                const active = new Set(event.banquet.segments.map((segment) => segment.name));
+                if (enabled) {
+                  active.add(option.name);
+                } else {
+                  active.delete(option.name);
+                }
+                return {
+                  ...event,
+                  banquet: {
+                    ...event.banquet,
+                    segments: buildBanquetSegments(Array.from(active), event.pax),
+                  },
+                };
+              })
             }
           />
         ))}
@@ -274,4 +285,3 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
 });
-

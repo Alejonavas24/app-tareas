@@ -8,8 +8,20 @@ interface TimelineGanttProps {
   anchor: HHMM;
 }
 
-const MIN_ROW_WIDTH = 920;
-const LABEL_WIDTH = 188;
+const MIN_ROW_WIDTH = 960;
+const LABEL_WIDTH = 196;
+const ROW_HEIGHT = 76;
+const TRACK_HEIGHT = 46;
+
+function staffLabel(block: TimelineBlock): string | undefined {
+  if (block.staffText) {
+    return block.staffText;
+  }
+  if (block.staffMin != null && block.staffMax != null) {
+    return block.staffMin === block.staffMax ? `${block.staffMin} pax` : `${block.staffMin}-${block.staffMax} pax`;
+  }
+  return block.team;
+}
 
 function phaseLabel(phase: Phase): string {
   switch (phase) {
@@ -67,13 +79,15 @@ export function TimelineGantt({ blocks, anchor }: TimelineGanttProps) {
   const span = Math.max(maxEnd - minStart, 60);
   const tickStep = span <= 360 ? 15 : 30;
   const ticks: number[] = [];
+  const rowWidth = Math.max(MIN_ROW_WIDTH, LABEL_WIDTH + span * 4);
+
   for (let minute = minStart; minute <= maxEnd; minute += tickStep) {
     ticks.push(minute);
   }
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator>
-      <View style={[styles.wrap, { width: MIN_ROW_WIDTH }]}>
+      <View style={[styles.wrap, { width: rowWidth }]}>
         <View style={styles.headerRow}>
           <View style={styles.labelPane}>
             <Text style={styles.headerLabel}>Momento</Text>
@@ -92,31 +106,40 @@ export function TimelineGantt({ blocks, anchor }: TimelineGanttProps) {
 
         {blocks.map((block) => {
           const start = toEventMinute(block.start, anchor) - minStart;
-          const widthPct = Math.max((block.durationMinutes / span) * 100, block.phase === "transicion" ? 4 : 6);
           const leftPct = (start / span) * 100;
+          const widthPct = Math.max((block.durationMinutes / span) * 100, block.phase === "transicion" ? 4 : 6);
           const color =
             colors.modules[(block.colorKey as keyof typeof colors.modules) ?? "taupe"] ?? colors.primary;
           const phaseVisual = phaseStyle(block.phase);
+          const staff = staffLabel(block);
+
           return (
             <View key={block.id} style={styles.row}>
               <View style={styles.labelPane}>
-                <Text numberOfLines={2} style={styles.blockLabel}>
+                <Text numberOfLines={1} ellipsizeMode="tail" style={styles.blockLabel}>
                   {block.label}
                 </Text>
                 <View style={styles.metaRow}>
                   <View style={[styles.phaseChip, { backgroundColor: colors.phase[block.phase] ?? colors.primary }]}>
                     <Text style={styles.phaseChipText}>{phaseLabel(block.phase)}</Text>
                   </View>
-                  <Text style={styles.blockMeta}>
-                    {block.start}-{block.end}
+                  <Text numberOfLines={1} style={styles.blockMeta}>
+                    {block.start} - {block.end}
                   </Text>
+                  {staff ? (
+                    <Text numberOfLines={1} style={styles.blockMeta}>
+                      {staff}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
+
               <View style={styles.track}>
                 {ticks.map((minute) => {
                   const left = ((minute - minStart) / span) * 100;
                   return <View key={`${block.id}-${minute}`} style={[styles.gridLine, { left: `${left}%` }]} />;
                 })}
+
                 <View
                   style={[
                     styles.bar,
@@ -125,12 +148,12 @@ export function TimelineGantt({ blocks, anchor }: TimelineGanttProps) {
                       left: `${leftPct}%`,
                       width: `${widthPct}%`,
                       backgroundColor: color,
-                      height: block.phase === "transicion" ? 24 : 36,
+                      height: block.phase === "transicion" ? 22 : 34,
                     },
                   ]}
                 >
                   <Text numberOfLines={1} style={styles.barText}>
-                    {phaseLabel(block.phase)} · {block.durationMinutes} min
+                    {phaseLabel(block.phase)} - {block.durationMinutes} min{staff ? ` - ${staff}` : ""}
                   </Text>
                 </View>
               </View>
@@ -147,7 +170,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerRow: {
-    minHeight: 42,
+    height: 42,
     flexDirection: "row",
     gap: spacing.sm,
     marginBottom: spacing.xs,
@@ -175,24 +198,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   row: {
-    minHeight: 68,
+    height: ROW_HEIGHT,
     flexDirection: "row",
     gap: spacing.sm,
+    alignItems: "center",
   },
   labelPane: {
     width: LABEL_WIDTH,
+    height: ROW_HEIGHT,
     justifyContent: "center",
   },
   blockLabel: {
     color: colors.textStrong,
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 17,
   },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: spacing.sm,
     marginTop: 4,
   },
@@ -211,10 +235,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 11,
+    flexShrink: 1,
   },
   track: {
     flex: 1,
-    height: 52,
+    height: TRACK_HEIGHT,
     justifyContent: "center",
     borderRadius: radii.sm,
     backgroundColor: colors.canvas,
@@ -235,6 +260,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: radii.sm,
     paddingHorizontal: spacing.sm,
+    overflow: "hidden",
   },
   barText: {
     color: colors.white,
@@ -247,4 +273,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-
