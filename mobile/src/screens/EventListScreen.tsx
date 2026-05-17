@@ -1,5 +1,6 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { CalendarDays, Copy, Plus, Trash2 } from "lucide-react-native";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -15,9 +16,34 @@ export function EventListScreen({ navigation }: Props) {
   const { events, loading, error, loadEvents, createDraft, openEvent, deleteEvent } =
     useTimelineStore();
 
-  useEffect(() => {
-    void loadEvents();
-  }, [loadEvents]);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      let refreshing = false;
+
+      const refresh = async () => {
+        if (!active || refreshing) {
+          return;
+        }
+        refreshing = true;
+        try {
+          await loadEvents();
+        } finally {
+          refreshing = false;
+        }
+      };
+
+      void refresh();
+      const interval = setInterval(() => {
+        void refresh();
+      }, 20000);
+
+      return () => {
+        active = false;
+        clearInterval(interval);
+      };
+    }, [loadEvents]),
+  );
 
   const openDbEvent = useCallback(
     async (dbId: string) => {

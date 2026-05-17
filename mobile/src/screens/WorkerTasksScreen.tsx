@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Check, CheckCheck, Play } from "lucide-react-native";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -7,6 +8,7 @@ import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
 import type { WorkerTask } from "../domain/types";
 import type { RootStackParamList } from "../navigation/types";
+import { subscribeToTaskInstanceChanges } from "../services/supabase";
 import { useOperationsStore } from "../store/operationsStore";
 import { useSessionStore } from "../store/sessionStore";
 import { colors, spacing } from "../theme/tokens";
@@ -94,11 +96,40 @@ export function WorkerTasksScreen({ navigation }: Props) {
     : 0;
   const selectedBlock = selectedEvent?.blocks[selectedBlockIndex];
 
-  useEffect(() => {
-    if (session?.employeeId) {
-      void loadTasksForEmployee(session.employeeId, includeCompleted);
-    }
-  }, [includeCompleted, loadTasksForEmployee, session?.employeeId]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!session?.employeeId) {
+        return undefined;
+      }
+
+      let active = true;
+      let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+      const employeeId = session.employeeId;
+
+      const refresh = () => {
+        if (!active) {
+          return;
+        }
+        void loadTasksForEmployee(employeeId, includeCompleted);
+      };
+
+      refresh();
+      const unsubscribe = subscribeToTaskInstanceChanges(() => {
+        if (refreshTimer) {
+          clearTimeout(refreshTimer);
+        }
+        refreshTimer = setTimeout(refresh, 350);
+      });
+
+      return () => {
+        active = false;
+        if (refreshTimer) {
+          clearTimeout(refreshTimer);
+        }
+        unsubscribe();
+      };
+    }, [includeCompleted, loadTasksForEmployee, session?.employeeId]),
+  );
 
   useEffect(() => {
     if (!selectedEventId && eventGroups[0]) {

@@ -614,6 +614,22 @@ export async function loadWorkerTasks(
   return (data ?? []) as WorkerTask[];
 }
 
+export function subscribeToTaskInstanceChanges(onChange: () => void): () => void {
+  ensureEnv();
+  const channel = supabase
+    .channel("worker-task-instance-changes")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "tareas", table: "event_task_instances" },
+      onChange,
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
 export async function completeTask(taskInstanceId: string, employeeId: string): Promise<void> {
   ensureEnv();
   const { error } = await supabase.rpc("complete_worker_task", {
