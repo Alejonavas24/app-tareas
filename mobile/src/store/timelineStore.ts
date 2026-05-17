@@ -10,6 +10,7 @@ import {
   getTimelineEvent,
   listTimelineEvents,
   markAssumptionReviewed,
+  saveCurrentEventWithTasks,
   saveTimelineSnapshot,
 } from "../services/supabase";
 
@@ -33,6 +34,7 @@ interface TimelineState {
   updateDraft: (updater: (draft: EventConfig) => EventConfig) => void;
   regenerate: () => TimelineResult | undefined;
   saveCurrent: () => Promise<TimelineSnapshot | undefined>;
+  saveCurrentWithTasks: () => Promise<TimelineSnapshot | undefined>;
   setAssumptionReviewed: (assumptionId: string, reviewed: boolean) => Promise<void>;
   clearError: () => void;
 }
@@ -114,8 +116,26 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     try {
       const snapshot = await getTimelineEvent(dbId);
       const draft = applyOperationalSchedule(snapshot.eventConfig);
-      const result = snapshot.blocks?.length ? resultFromSnapshot(snapshot) : generateWithCatalog(draft, get().catalog);
-      set({ draft, result, dbId: snapshot.dbId ?? dbId, loading: false });
+      try {
+        const catalog = await getEventCatalog(draft.pax);
+        set({
+          catalog,
+          catalogSource: "supabase",
+          draft,
+          result: generateWithCatalog(draft, catalog),
+          dbId: snapshot.dbId ?? dbId,
+          loading: false,
+        });
+      } catch {
+        set({
+          catalog: fallbackEventCatalog,
+          catalogSource: "fallback",
+          draft,
+          result: generateWithCatalog(draft, fallbackEventCatalog),
+          dbId: snapshot.dbId ?? dbId,
+          loading: false,
+        });
+      }
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
     }
@@ -171,6 +191,30 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
     set({ saving: true, error: undefined });
     try {
       const saved = await saveTimelineSnapshot(buildSnapshot(draft, freshResult, dbId));
+      const normalizedDraft = applyOperationalSchedule(saved.eventConfig);
+      set({
+        dbId: saved.dbId,
+        draft: normalizedDraft,
+        result: resultFromSnapshot(saved),
+        saving: false,
+      });
+      await get().loadEvents();
+      return saved;
+    } catch (error) {
+      set({ error: (error as Error).message, saving: false });
+      return undefined;
+    }
+  },
+
+  async saveCurrentWithTasks() {
+    const { draft, result, dbId } = get();
+    if (!draft) {
+      return undefined;
+    }
+    const freshResult = result ?? generateWithCatalog(draft, get().catalog);
+    set({ saving: true, error: undefined });
+    try {
+      const saved = await saveCurrentEventWithTasks(buildSnapshot(draft, freshResult, dbId), get().catalog);
       const normalizedDraft = applyOperationalSchedule(saved.eventConfig);
       set({
         dbId: saved.dbId,

@@ -23,10 +23,19 @@ import type {
 } from "./types";
 
 const STAND_REFS: Record<string, { ref: string; label: string }> = {
+  arroz: { ref: "P_AR", label: "Puesto arroz" },
   jamon_1x50: { ref: "P_JA", label: "Puesto jamon" },
+  jamon_2h: { ref: "P_JA_2j", label: "Puesto jamon 2h" },
   quesos_clasico: { ref: "P_QU_C", label: "Puesto quesos clasico" },
+  quesos_embutidos: { ref: "P_QU-EM", label: "Puesto quesos y embutidos" },
   croquetas: { ref: "P_CR", label: "Puesto croquetas" },
   cerveza: { ref: "P_CE", label: "Puesto cerveza" },
+  huevos: { ref: "P_HU", label: "Puesto huevos" },
+  mojitos: { ref: "P_MO", label: "Puesto mojitos" },
+  navajas_zamburinas: { ref: "P_NA-ZA", label: "Puesto navajas/zamburinas" },
+  sushi: { ref: "P_SU", label: "Puesto sushi" },
+  tortilla: { ref: "P_TO", label: "Puesto tortilla" },
+  vermut: { ref: "P_VE", label: "Puesto vermut" },
 };
 
 const RESOPON_REFS: Record<string, string> = {
@@ -114,6 +123,47 @@ function laterTime(a: HHMM, b: HHMM, anchor: HHMM): HHMM {
   return sortHHMM(a, b, anchor) >= 0 ? a : b;
 }
 
+function asPositiveDuration(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return value;
+}
+
+function catalogDurationMinutes(entry: CatalogEventBlock | undefined, prefer200 = false): number | null {
+  if (!entry) {
+    return null;
+  }
+
+  const minDuration = asPositiveDuration(entry.duracionMinima);
+  const maxDuration = asPositiveDuration(entry.duracionMax);
+  if (minDuration != null && maxDuration != null) {
+    return Math.round((minDuration + maxDuration) / 2);
+  }
+
+  return asPositiveDuration(prefer200 ? entry.over200DurationReferenceMin : null) ?? asPositiveDuration(entry.duracionReferenciaMin);
+}
+
+function strictCatalogRange(
+  entry: CatalogEventBlock | undefined,
+  phase: Phase,
+  start: HHMM,
+  end: HHMM,
+  prefer200 = false,
+) {
+  const minutes = catalogDurationMinutes(entry, prefer200);
+  if (!minutes || minutes <= 0) {
+    return { start, end };
+  }
+  if (phase === "previa") {
+    return { start: addMinutes(end, -minutes), end };
+  }
+  if (phase === "posterior") {
+    return { start, end: addMinutes(start, minutes) };
+  }
+  return { start, end };
+}
+
 function buildBlock(input: {
   catalog: EventCatalog;
   id: string;
@@ -128,22 +178,24 @@ function buildBlock(input: {
   notes?: string;
   assumptions?: string[];
   catalogBlockId?: string;
+  prefer200?: boolean;
 }): TimelineBlock {
   const entry = input.reference
     ? findCatalog(input.catalog, input.reference, input.phase, input.catalogBlockId)
     : undefined;
+  const range = strictCatalogRange(entry, input.phase, input.start, input.end, input.prefer200);
   return {
     id: input.id,
     label: input.label,
     module: input.module,
     phase: input.phase,
-    start: input.start,
-    end: input.end,
+    start: range.start,
+    end: range.end,
     reference: input.reference,
     parentBlockId: input.parentBlockId,
     team: input.team,
     notes: input.notes ?? catalogNote(entry),
-    durationMinutes: diffMinutes(input.start, input.end),
+    durationMinutes: diffMinutes(range.start, range.end),
     colorKey: MODULE_COLORS[input.module] ?? "taupe",
     assumptions: input.assumptions ?? [],
     overlapsWith: [],
@@ -258,8 +310,8 @@ function addCeremony(catalog: EventCatalog, event: EventConfig, blocks: Timeline
         label: "Ceremonia civil - previa",
         module: "ceremonia",
         phase: "previa",
-        start: event.openDoorsTime,
-        end: ceremony.start,
+        start: addMinutes(event.openDoorsTime, -50),
+        end: event.openDoorsTime,
         reference: "C_CI",
         parentBlockId: "ceremony",
         team: "T1",
@@ -298,8 +350,8 @@ function addCeremony(catalog: EventCatalog, event: EventConfig, blocks: Timeline
         label: "Puesto limonada - previa",
         module: "limonada",
         phase: "previa",
-        start: event.openDoorsTime,
-        end: ceremony.start,
+        start: addMinutes(event.openDoorsTime, -38),
+        end: event.openDoorsTime,
         reference: "P_LIM",
         parentBlockId: "limonada",
         team: "T1",
@@ -331,14 +383,20 @@ function addCeremony(catalog: EventCatalog, event: EventConfig, blocks: Timeline
   addMomentStands(catalog, event, blocks, warnings, {
     moment: "ceremony",
     momentLabel: "ceremonia",
-    previaStart: event.openDoorsTime,
+    previaStart: addMinutes(event.openDoorsTime, -diffMinutes(event.openDoorsTime, ceremony.start)),
+    previaEnd: event.openDoorsTime,
     serviceStart: ceremony.start,
     serviceEnd: ceremony.end,
   });
 
   if (event.briefing?.enabled) {
-    const start = event.briefing.mode === "secuencial" && event.briefing.start ? event.briefing.start : ceremony.start;
-    const end = event.briefing.mode === "secuencial" && event.briefing.end ? event.briefing.end : ceremony.end;
+    const briefingEntry = findCatalog(catalog, "ACTA", "briefing", "B17b");
+    const briefingMinutes = catalogDurationMinutes(briefingEntry, event.pax > 200) ?? 15;
+    const start =
+      event.briefing.mode === "secuencial" && event.briefing.start
+        ? event.briefing.start
+        : addMinutes(event.openDoorsTime, -briefingMinutes);
+    const end = event.briefing.mode === "secuencial" && event.briefing.end ? event.briefing.end : event.openDoorsTime;
     addIfValid(
       blocks,
       warnings,
@@ -372,6 +430,7 @@ function addMomentStands(
     moment: EventStand["moment"];
     momentLabel: string;
     previaStart?: HHMM;
+    previaEnd?: HHMM;
     serviceStart?: HHMM;
     serviceEnd?: HHMM;
   },
@@ -408,7 +467,7 @@ function addMomentStands(
           module: "puesto",
           phase: "previa",
           start: input.previaStart,
-          end: input.serviceStart,
+          end: input.previaEnd ?? input.serviceStart,
           reference: stand.ref,
           parentBlockId,
           team: "Puesto",
@@ -439,6 +498,7 @@ function addMomentStands(
         }),
         event.openDoorsTime,
       );
+
     }
   }
 }
@@ -472,8 +532,8 @@ function addCocktail(catalog: EventCatalog, event: EventConfig, blocks: Timeline
       label: "Coctel - previa",
       module: "coctel",
       phase: "previa",
-      start: previousStart,
-      end: cocktailStart,
+      start: addMinutes(event.openDoorsTime, -35),
+      end: event.openDoorsTime,
       reference: "COC_L",
       catalogBlockId: "B17",
       parentBlockId: "cocktail",
@@ -511,7 +571,8 @@ function addCocktail(catalog: EventCatalog, event: EventConfig, blocks: Timeline
   addMomentStands(catalog, event, blocks, warnings, {
     moment: "cocktail",
     momentLabel: "coctel",
-    previaStart: previousStart,
+    previaStart: addMinutes(event.openDoorsTime, -diffMinutes(previousStart, cocktailStart)),
+    previaEnd: event.openDoorsTime,
     serviceStart: cocktailStart,
     serviceEnd: cocktailEnd,
   });
@@ -715,7 +776,8 @@ function addParty(
   addMomentStands(catalog, event, blocks, warnings, {
     moment: "party",
     momentLabel: "fiesta",
-    previaStart: addMinutes(firstPartyStart, -45),
+    previaStart: addMinutes(event.openDoorsTime, -45),
+    previaEnd: event.openDoorsTime,
     serviceStart: firstPartyStart,
     serviceEnd: lastPartyEnd,
   });

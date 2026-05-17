@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { Save } from "lucide-react-native";
 import { Field, ToggleRow } from "../components/Field";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
@@ -16,9 +17,18 @@ type Props = NativeStackScreenProps<RootStackParamList, "Configurator">;
 
 const STAND_OPTIONS = [
   { id: "jamon_1x50", label: "Jamon" },
+  { id: "jamon_2h", label: "Jamon 2h" },
   { id: "quesos_clasico", label: "Quesos" },
+  { id: "quesos_embutidos", label: "Quesos y embutidos" },
   { id: "croquetas", label: "Croquetas" },
   { id: "cerveza", label: "Cerveza" },
+  { id: "arroz", label: "Arroz" },
+  { id: "huevos", label: "Huevos" },
+  { id: "mojitos", label: "Mojitos" },
+  { id: "navajas_zamburinas", label: "Navajas/zamburinas" },
+  { id: "sushi", label: "Sushi" },
+  { id: "tortilla", label: "Tortilla" },
+  { id: "vermut", label: "Vermut" },
 ] satisfies { id: EventStand["id"]; label: string }[];
 
 const STAND_MOMENTS: { id: StandMoment; label: string }[] = [
@@ -27,8 +37,34 @@ const STAND_MOMENTS: { id: StandMoment; label: string }[] = [
   { id: "party", label: "Fiesta" },
 ];
 
+function formatHoursFromMinutes(minutes?: number): string {
+  const hours = (minutes ?? 0) / 60;
+  return Number.isInteger(hours) ? String(hours) : String(Number(hours.toFixed(2)));
+}
+
+function parseHoursToMinutes(value: string, fallbackMinutes?: number): number {
+  const normalized = value.replace(",", ".");
+  const hours = Number(normalized);
+
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return fallbackMinutes ?? 0;
+  }
+
+  return Math.round(hours * 60);
+}
+
 export function ConfiguratorScreen({ navigation }: Props) {
-  const { draft, createDraft, updateDraft, regenerate, result, loadCatalog, catalogSource } = useTimelineStore();
+  const {
+    draft,
+    createDraft,
+    updateDraft,
+    regenerate,
+    result,
+    loadCatalog,
+    catalogSource,
+    saving,
+    saveCurrentWithTasks,
+  } = useTimelineStore();
 
   useEffect(() => {
     if (!draft) {
@@ -75,12 +111,34 @@ export function ConfiguratorScreen({ navigation }: Props) {
       };
     });
 
+  async function handleSaveEvent() {
+    regenerate();
+    const saved = await saveCurrentWithTasks();
+    if (saved?.dbId) {
+      Alert.alert("Evento guardado", "El evento quedo guardado y las tareas fueron generadas.");
+    } else {
+      Alert.alert("No se pudo guardar", useTimelineStore.getState().error ?? "Revisa la conexion con Supabase.");
+    }
+  }
+
   return (
     <Screen
       title="Momentos de la boda"
       subtitle="Activa los momentos, pon la hora inicial y genera el Gantt."
       footer={
         <View style={styles.footer}>
+          <PrimaryButton
+            label="Volver"
+            variant="secondary"
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: "AdminPanel" }] })}
+          />
+          <PrimaryButton
+            label="Guardar evento"
+            variant="secondary"
+            icon={Save}
+            loading={saving}
+            onPress={() => void handleSaveEvent()}
+          />
           <PrimaryButton
             label="Generar diagrama"
             onPress={() => {
@@ -150,9 +208,25 @@ export function ConfiguratorScreen({ navigation }: Props) {
         <MomentRow
           label="Coctel"
           enabled={draft.cocktail.enabled}
-          caption={`${draft.cocktail.start ?? "--"} - ${draft.cocktail.end ?? "--"}`}
+          caption={`${draft.cocktail.start ?? "--"} - ${draft.cocktail.end ?? "--"} - ${formatHoursFromMinutes(draft.cocktail.totalMinutes)} h servicio`}
           onToggle={(enabled) => updateDraft((event) => ({ ...event, cocktail: { ...event.cocktail, enabled } }))}
         />
+        {draft.cocktail.enabled ? (
+          <Field
+            label="Duracion coctel (horas)"
+            value={formatHoursFromMinutes(draft.cocktail.totalMinutes)}
+            keyboardType="numeric"
+            onChangeText={(value) =>
+              updateDraft((event) => ({
+                ...event,
+                cocktail: {
+                  ...event.cocktail,
+                  totalMinutes: parseHoursToMinutes(value, event.cocktail.totalMinutes),
+                },
+              }))
+            }
+          />
+        ) : null}
         <MomentRow
           label="Banquete"
           enabled={draft.banquet.enabled}
@@ -162,9 +236,25 @@ export function ConfiguratorScreen({ navigation }: Props) {
         <MomentRow
           label="Fiesta"
           enabled={draft.party.enabled}
-          caption={`${draft.party.segments[0]?.start ?? "--"} - ${draft.party.segments[draft.party.segments.length - 1]?.end ?? "--"}`}
+          caption={`${draft.party.segments[0]?.start ?? "--"} - ${draft.party.segments[draft.party.segments.length - 1]?.end ?? "--"} - ${formatHoursFromMinutes(draft.party.totalMinutes)} h servicio`}
           onToggle={(enabled) => updateDraft((event) => ({ ...event, party: { ...event.party, enabled } }))}
         />
+        {draft.party.enabled ? (
+          <Field
+            label="Duracion fiesta (horas)"
+            value={formatHoursFromMinutes(draft.party.totalMinutes)}
+            keyboardType="numeric"
+            onChangeText={(value) =>
+              updateDraft((event) => ({
+                ...event,
+                party: {
+                  ...event.party,
+                  totalMinutes: parseHoursToMinutes(value, event.party.totalMinutes),
+                },
+              }))
+            }
+          />
+        ) : null}
         <MomentRow
           label="Resopon"
           enabled={draft.resopon.enabled}
@@ -288,6 +378,7 @@ function QuickStat({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   footer: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.md,
   },
   row: {

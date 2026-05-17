@@ -1,15 +1,43 @@
 import "react-native-url-polyfill/auto";
 import { createClient } from "@supabase/supabase-js";
-import type { CatalogEventBlock, CatalogTask, EventCatalog, TimelineEventSummary, TimelineSnapshot } from "../domain/types";
+import type {
+  AssignableEmployee,
+  CatalogEventBlock,
+  CatalogTask,
+  DeviceSession,
+  EventCatalog,
+  EventStaffAssignment,
+  EventTaskInstance,
+  TimelineEventSummary,
+  TimelineSnapshot,
+  WorkerTask,
+} from "../domain/types";
+import { parseRoles } from "../domain/assignments";
+import { previewMaterializedTasks } from "../domain/taskMaterialization";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const deviceSupabaseUrl = process.env.EXPO_PUBLIC_DEVICE_SUPABASE_URL ?? "";
+const deviceSupabaseAnonKey = process.env.EXPO_PUBLIC_DEVICE_SUPABASE_ANON_KEY ?? "";
 
 export const hasSupabaseEnv = Boolean(supabaseUrl && supabaseAnonKey);
+export const hasDeviceSupabaseEnv = Boolean(deviceSupabaseUrl && deviceSupabaseAnonKey);
 
 export const supabase = createClient(
   supabaseUrl || "https://example.supabase.co",
   supabaseAnonKey || "anon-key-missing",
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  },
+);
+
+export const deviceSupabase = createClient(
+  deviceSupabaseUrl || "https://pqqyaytegdemfobrutmt.supabase.co",
+  deviceSupabaseAnonKey || "anon-key-missing",
   {
     auth: {
       persistSession: false,
@@ -25,26 +53,36 @@ function ensureEnv() {
   }
 }
 
+function ensureDeviceEnv() {
+  if (!hasDeviceSupabaseEnv) {
+    throw new Error(
+      "Faltan EXPO_PUBLIC_DEVICE_SUPABASE_URL y EXPO_PUBLIC_DEVICE_SUPABASE_ANON_KEY en mobile/.env",
+    );
+  }
+}
+
 export async function listTimelineEvents(): Promise<TimelineEventSummary[]> {
-  return [];
+  ensureEnv();
+  const { data, error } = await supabase.rpc("list_timeline_events");
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data ?? []) as TimelineEventSummary[];
 }
 
 export async function getEventCatalog(pax?: number): Promise<EventCatalog> {
   ensureEnv();
-  const [blocksResult, tasksResult] = await Promise.all([
-    supabase
-      .from("event_catalog_blocks")
-      .select("*")
-      .order("sort_order", { ascending: true, nullsFirst: false })
-      .order("block_sort", { ascending: true })
-      .order("block_id", { ascending: true }),
-    supabase
-      .from("event_catalog_tasks")
-      .select("*")
-      .order("block_id", { ascending: true })
-      .order("task_sort", { ascending: true, nullsFirst: false })
-      .order("task_code", { ascending: true }),
+  let [blocksResult, tasksResult] = await Promise.all([
+    queryCatalogBlocks("public", "event_catalog_blocks"),
+    queryCatalogTasks("public", "event_catalog_tasks"),
   ]);
+
+  if (blocksResult.error || tasksResult.error) {
+    [blocksResult, tasksResult] = await Promise.all([
+      queryCatalogBlocks("tareas", "event_blocks"),
+      queryCatalogTasks("tareas", "event_tasks"),
+    ]);
+  }
 
   if (blocksResult.error) {
     throw new Error(blocksResult.error.message);
@@ -74,6 +112,24 @@ export async function getEventCatalog(pax?: number): Promise<EventCatalog> {
   };
 }
 
+function queryCatalogBlocks(schema: "public" | "tareas", table: string) {
+  const source = schema === "public" ? supabase.from(table) : supabase.schema(schema).from(table);
+  return source
+    .select("*")
+    .order("sort_order", { ascending: true, nullsFirst: false })
+    .order("block_sort", { ascending: true })
+    .order("block_id", { ascending: true });
+}
+
+function queryCatalogTasks(schema: "public" | "tareas", table: string) {
+  const source = schema === "public" ? supabase.from(table) : supabase.schema(schema).from(table);
+  return source
+    .select("*")
+    .order("block_id", { ascending: true })
+    .order("task_sort", { ascending: true, nullsFirst: false })
+    .order("task_code", { ascending: true });
+}
+
 type CatalogBlockRow = {
   block_id: string;
   block_sort: string;
@@ -97,13 +153,15 @@ type CatalogBlockRow = {
   task_codes: string[] | null;
   codigos_relacionados_otros_roles: string | null;
   notas_operativas: string | null;
-  duracion_referencia_min: number | null;
+  duracion_minima?: number | null;
+  duracion_max?: number | null;
+  duracion_referencia_min?: number | null;
   observacion_acta: string | null;
   over_200_adjustment: string | null;
   over_200_waiter_codes: string[] | null;
   over_200_other_role_codes: string[] | null;
   over_200_notes: string | null;
-  over_200_duration_reference_min: number | null;
+  over_200_duration_reference_min?: number | null;
   over_200_observacion_acta: string | null;
   over_200_non_task_adjustments: unknown[] | null;
 };
@@ -157,6 +215,8 @@ function mapCatalogBlock(row: CatalogBlockRow): CatalogEventBlock {
     taskCodes: row.task_codes ?? [],
     codigosRelacionadosOtrosRoles: row.codigos_relacionados_otros_roles,
     notasOperativas: row.notas_operativas,
+    duracionMinima: row.duracion_minima ?? null,
+    duracionMax: row.duracion_max ?? null,
     duracionReferenciaMin: row.duracion_referencia_min,
     observacionActa: row.observacion_acta,
     over200Adjustment: row.over_200_adjustment,
@@ -193,19 +253,78 @@ function mapCatalogTask(row: CatalogTaskRow): CatalogTask {
     over200Scope: row.over_200_scope,
     over200Adjustment: row.over_200_adjustment,
     over200Notes: row.over_200_notes,
+    requiredLevel: 0,
   };
 }
 
 export async function getTimelineEvent(dbId: string): Promise<TimelineSnapshot> {
-  throw new Error(`La persistencia de eventos fue retirada del backend actual (${dbId}).`);
+  ensureEnv();
+  const { data, error } = await supabase.rpc("get_timeline_event", { p_event_id: dbId });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data as TimelineSnapshot;
 }
 
 export async function saveTimelineSnapshot(snapshot: TimelineSnapshot): Promise<TimelineSnapshot> {
-  throw new Error(`La persistencia de eventos fue retirada del backend actual (${snapshot.externalId}).`);
+  ensureEnv();
+  const { data, error } = await supabase.rpc("save_timeline_snapshot", { p_payload: snapshot });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data as TimelineSnapshot;
+}
+
+export async function saveCurrentEventWithTasks(
+  snapshot: TimelineSnapshot,
+  catalog?: EventCatalog,
+): Promise<TimelineSnapshot> {
+  const saved = await saveTimelineSnapshot(snapshot);
+  if (!saved.dbId) {
+    return saved;
+  }
+  const taskPayload = catalog ? previewMaterializedTasks(saved.blocks ?? [], catalog).map((task) => ({
+    block_key: task.blockKey,
+    block_id: task.blockId,
+    task_code: task.taskCode,
+    task_sort: task.taskSort ?? null,
+    task_name: task.taskName,
+    details: task.details ?? null,
+    start_time: task.startTime,
+    end_time: task.endTime,
+    responsable: task.responsable ?? null,
+    dependency_code: task.dependencyCode ?? null,
+    required_level: task.requiredLevel,
+  })) : [];
+
+  if (taskPayload.length > 0) {
+    const payloadResult = await supabase.rpc("materialize_event_tasks_from_payload", {
+      p_event_id: saved.dbId,
+      p_tasks: taskPayload,
+    });
+    if (payloadResult.error) {
+      const legacyResult = await supabase.rpc("materialize_event_tasks", { p_event_id: saved.dbId });
+      if (legacyResult.error) {
+        throw new Error(
+          `Evento guardado, pero no se pudieron materializar tareas: ${payloadResult.error.message}; ${legacyResult.error.message}`,
+        );
+      }
+    }
+  } else {
+    const { error } = await supabase.rpc("materialize_event_tasks", { p_event_id: saved.dbId });
+    if (error) {
+      throw new Error(`Evento guardado, pero no se pudieron materializar tareas: ${error.message}`);
+    }
+  }
+  return getTimelineEvent(saved.dbId);
 }
 
 export async function deleteTimelineEvent(dbId: string): Promise<void> {
-  throw new Error(`La persistencia de eventos fue retirada del backend actual (${dbId}).`);
+  ensureEnv();
+  const { error } = await supabase.rpc("delete_timeline_event", { p_event_id: dbId });
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 export async function markAssumptionReviewed(
@@ -213,7 +332,197 @@ export async function markAssumptionReviewed(
   assumptionId: string,
   reviewed: boolean,
 ): Promise<TimelineSnapshot> {
-  throw new Error(
-    `La persistencia de revisiones fue retirada del backend actual (${dbId}, ${assumptionId}, ${String(reviewed)}).`,
-  );
+  ensureEnv();
+  const { data, error } = await supabase.rpc("mark_timeline_assumption_reviewed", {
+    p_event_id: dbId,
+    p_assumption_key: assumptionId,
+    p_reviewed: reviewed,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data as TimelineSnapshot;
+}
+
+type DeviceRow = {
+  device_id: string;
+  active: boolean | null;
+  employee_id: string | number | null;
+};
+
+type EmployeeRow = {
+  id: string | number;
+  full_name: string | null;
+  active: boolean | null;
+  rol: string | null;
+};
+
+export async function validateDeviceSession(deviceId: string): Promise<DeviceSession> {
+  ensureDeviceEnv();
+  const normalizedDeviceId = deviceId.trim();
+  if (!normalizedDeviceId) {
+    throw new Error("No se pudo leer el ID nativo del dispositivo.");
+  }
+
+  const { data: device, error: deviceError } = await deviceSupabase
+    .from("managed_devices")
+    .select("device_id, active, employee_id")
+    .eq("device_id", normalizedDeviceId)
+    .maybeSingle<DeviceRow>();
+
+  if (deviceError) {
+    throw new Error(deviceError.message);
+  }
+  if (!device) {
+    throw new Error(`Dispositivo no registrado: ${normalizedDeviceId}`);
+  }
+  if (!device.active) {
+    throw new Error("Este dispositivo esta inactivo.");
+  }
+  if (!device.employee_id) {
+    throw new Error("El dispositivo no tiene empleado asignado.");
+  }
+
+  const { data: employee, error: employeeError } = await deviceSupabase
+    .from("employees")
+    .select("id, full_name, active, rol")
+    .eq("id", device.employee_id)
+    .maybeSingle<EmployeeRow>();
+
+  if (employeeError) {
+    throw new Error(employeeError.message);
+  }
+  if (!employee) {
+    throw new Error("No se encontro el empleado vinculado al dispositivo.");
+  }
+  if (!employee.active) {
+    throw new Error("El empleado vinculado esta inactivo.");
+  }
+
+  return {
+    deviceId: normalizedDeviceId,
+    employeeId: String(employee.id),
+    fullName: employee.full_name ?? "Empleado",
+    roles: parseRoles(employee.rol),
+    active: true,
+  };
+}
+
+export async function listAssignableWaiters(): Promise<AssignableEmployee[]> {
+  ensureDeviceEnv();
+  const { data, error } = await deviceSupabase
+    .from("employees")
+    .select("id, full_name, active, rol")
+    .eq("active", true)
+    .order("full_name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as EmployeeRow[])
+    .map((employee) => ({
+      employeeId: String(employee.id),
+      fullName: employee.full_name ?? "Empleado",
+      roles: parseRoles(employee.rol),
+      skillLevel: 0,
+    }))
+    .filter((employee) => employee.roles.includes("camarero"));
+}
+
+export async function listEventStaff(eventId: string): Promise<EventStaffAssignment[]> {
+  ensureEnv();
+  const { data, error } = await supabase.rpc("list_event_staff", { p_event_id: eventId });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data ?? []) as EventStaffAssignment[];
+}
+
+export async function upsertEventStaff(
+  eventId: string,
+  employee: AssignableEmployee,
+  shift: Pick<EventStaffAssignment, "shiftName" | "shiftStart" | "shiftEnd">,
+): Promise<EventStaffAssignment> {
+  ensureEnv();
+  const { data, error } = await supabase.rpc("upsert_event_staff", {
+    p_event_id: eventId,
+    p_employee: employee,
+    p_shift: shift,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data as EventStaffAssignment;
+}
+
+export async function assignEventBlock(eventId: string, blockKey: string, staffId: string): Promise<void> {
+  ensureEnv();
+  const { error } = await supabase.rpc("assign_event_block", {
+    p_event_id: eventId,
+    p_block_key: blockKey,
+    p_staff_id: staffId,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function assignEventTask(taskInstanceId: string, staffId: string): Promise<void> {
+  ensureEnv();
+  const { error } = await supabase.rpc("assign_event_task", {
+    p_task_instance_id: taskInstanceId,
+    p_staff_id: staffId,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function listEventTasks(eventId: string): Promise<EventTaskInstance[]> {
+  ensureEnv();
+  const { data, error } = await supabase.rpc("list_event_tasks", { p_event_id: eventId });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data ?? []) as EventTaskInstance[];
+}
+
+export async function loadWorkerTasks(
+  employeeId: string,
+  options: { dateFrom?: string; dateTo?: string; includeCompleted?: boolean } = {},
+): Promise<WorkerTask[]> {
+  ensureEnv();
+  const { data, error } = await supabase.rpc("list_worker_tasks", {
+    p_employee_id: employeeId,
+    p_date_from: options.dateFrom ?? null,
+    p_date_to: options.dateTo ?? null,
+    p_include_completed: options.includeCompleted ?? false,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return (data ?? []) as WorkerTask[];
+}
+
+export async function completeTask(taskInstanceId: string, employeeId: string): Promise<void> {
+  ensureEnv();
+  const { error } = await supabase.rpc("complete_worker_task", {
+    p_task_instance_id: taskInstanceId,
+    p_employee_id: employeeId,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function startTask(taskInstanceId: string, employeeId: string): Promise<void> {
+  ensureEnv();
+  const { error } = await supabase.rpc("start_worker_task", {
+    p_task_instance_id: taskInstanceId,
+    p_employee_id: employeeId,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
 }

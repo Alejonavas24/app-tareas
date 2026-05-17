@@ -17,6 +17,15 @@ export const DEFAULT_STANDS: EventStand[] = [
   { id: "quesos_clasico", enabled: true, moment: "cocktail" },
   { id: "croquetas", enabled: false, moment: "cocktail" },
   { id: "cerveza", enabled: false, moment: "ceremony" },
+  { id: "arroz", enabled: false, moment: "cocktail" },
+  { id: "huevos", enabled: false, moment: "cocktail" },
+  { id: "jamon_2h", enabled: false, moment: "cocktail" },
+  { id: "mojitos", enabled: false, moment: "cocktail" },
+  { id: "navajas_zamburinas", enabled: false, moment: "cocktail" },
+  { id: "quesos_embutidos", enabled: false, moment: "cocktail" },
+  { id: "sushi", enabled: false, moment: "cocktail" },
+  { id: "tortilla", enabled: false, moment: "cocktail" },
+  { id: "vermut", enabled: false, moment: "cocktail" },
 ];
 
 export const DEFAULT_BANQUET_SEGMENTS = [
@@ -62,6 +71,7 @@ export function createEmptyEvent(): EventConfig {
       enabled: true,
       start: "14:00",
       end: "15:00",
+      totalMinutes: COCKTAIL_SERVICE_MINUTES,
       displacementAfterMinutes: 15,
       stands: [],
     },
@@ -222,7 +232,8 @@ export function applyOperationalSchedule(input: EventConfig): EventConfig {
   const cocktailStart = event.ceremony.enabled
     ? addMinutes(ceremonyEnd, event.ceremony.displacementAfterMinutes ?? 15)
     : addMinutes(event.openDoorsTime, COCKTAIL_WITHOUT_CEREMONY_OFFSET_MINUTES);
-  const cocktailEnd = addMinutes(cocktailStart, COCKTAIL_SERVICE_MINUTES);
+  const cocktailTotal = event.cocktail.totalMinutes ?? COCKTAIL_SERVICE_MINUTES;
+  const cocktailEnd = addMinutes(cocktailStart, cocktailTotal);
   const cocktail = {
     ...event.cocktail,
     start: cocktailStart,

@@ -107,7 +107,7 @@ export function TimelineGantt({ blocks, anchor }: TimelineGanttProps) {
         {blocks.map((block) => {
           const start = toEventMinute(block.start, anchor) - minStart;
           const leftPct = (start / span) * 100;
-          const widthPct = Math.max((block.durationMinutes / span) * 100, block.phase === "transicion" ? 4 : 6);
+          const widthPct = (block.durationMinutes / span) * 100;
           const color =
             colors.modules[(block.colorKey as keyof typeof colors.modules) ?? "taupe"] ?? colors.primary;
           const phaseVisual = phaseStyle(block.phase);
@@ -255,7 +255,6 @@ const styles = StyleSheet.create({
   },
   bar: {
     position: "absolute",
-    minWidth: 54,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radii.sm,

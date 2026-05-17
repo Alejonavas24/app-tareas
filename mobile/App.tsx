@@ -6,8 +6,12 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import type { RootStackParamList } from "./src/navigation/types";
+import { AdminPanelScreen } from "./src/screens/AdminPanelScreen";
 import { ConfiguratorScreen } from "./src/screens/ConfiguratorScreen";
+import { DeviceGateScreen } from "./src/screens/DeviceGateScreen";
+import { HomeScreen } from "./src/screens/HomeScreen";
 import { TimelineScreen } from "./src/screens/TimelineScreen";
+import { WorkerTasksScreen } from "./src/screens/WorkerTasksScreen";
 import { colors } from "./src/theme/tokens";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -50,6 +54,10 @@ export default function App() {
               contentStyle: { backgroundColor: colors.canvas },
             }}
           >
+            <Stack.Screen name="DeviceGate" component={DeviceGateScreen} />
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="AdminPanel" component={AdminPanelScreen} />
+            <Stack.Screen name="WorkerTasks" component={WorkerTasksScreen} />
             <Stack.Screen name="Configurator" component={ConfiguratorScreen} />
             <Stack.Screen name="Timeline" component={TimelineScreen} />
           </Stack.Navigator>

@@ -11,6 +11,22 @@ import { colors, spacing } from "../theme/tokens";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Schedule">;
 
+function formatHoursFromMinutes(minutes?: number): string {
+  const hours = (minutes ?? 0) / 60;
+  return Number.isInteger(hours) ? String(hours) : String(Number(hours.toFixed(2)));
+}
+
+function parseHoursToMinutes(value: string, fallbackMinutes?: number): number {
+  const normalized = value.replace(",", ".");
+  const hours = Number(normalized);
+
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return fallbackMinutes ?? 0;
+  }
+
+  return Math.round(hours * 60);
+}
+
 export function ScheduleScreen({ navigation }: Props) {
   const { draft, updateDraft, regenerate } = useTimelineStore();
 
@@ -52,6 +68,20 @@ export function ScheduleScreen({ navigation }: Props) {
           end={draft.cocktail.end ?? ""}
           onStart={(start) => updateDraft((event) => ({ ...event, cocktail: { ...event.cocktail, start } }))}
           onEnd={(end) => updateDraft((event) => ({ ...event, cocktail: { ...event.cocktail, end } }))}
+        />
+        <Field
+          label="Duracion coctel (horas)"
+          value={formatHoursFromMinutes(draft.cocktail.totalMinutes)}
+          keyboardType="numeric"
+          onChangeText={(value) =>
+            updateDraft((event) => ({
+              ...event,
+              cocktail: {
+                ...event.cocktail,
+                totalMinutes: parseHoursToMinutes(value, event.cocktail.totalMinutes),
+              },
+            }))
+          }
         />
         <Field
           label="Desplazamiento post coctel"
@@ -118,6 +148,20 @@ export function ScheduleScreen({ navigation }: Props) {
       </SectionCard>
 
       <SectionCard title="Fiesta y resopon">
+        <Field
+          label="Duracion fiesta (horas)"
+          value={formatHoursFromMinutes(draft.party.totalMinutes)}
+          keyboardType="numeric"
+          onChangeText={(value) =>
+            updateDraft((event) => ({
+              ...event,
+              party: {
+                ...event.party,
+                totalMinutes: parseHoursToMinutes(value, event.party.totalMinutes),
+              },
+            }))
+          }
+        />
         {draft.party.segments.map((segment, index) => (
           <View key={`${segment.name}-${index}`} style={styles.segment}>
             <Field

@@ -84,7 +84,7 @@ export function TimelineGrid({ blocks, anchor }: TimelineGridProps) {
           {blocks.map((block) => {
             const start = toEventMinute(block.start, anchor) - minStart;
             const left = (start / 15) * CELL_WIDTH;
-            const width = Math.max((block.durationMinutes / 15) * CELL_WIDTH, CELL_WIDTH);
+            const width = (block.durationMinutes / 15) * CELL_WIDTH;
             const color =
               colors.modules[(block.colorKey as keyof typeof colors.modules) ?? "taupe"] ?? colors.primary;
 
@@ -218,4 +218,3 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
-

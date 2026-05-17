@@ -21,7 +21,20 @@ export interface CeremonyConfig {
 export type StandMoment = "ceremony" | "cocktail" | "party";
 
 export interface EventStand {
-  id: "jamon_1x50" | "quesos_clasico" | "croquetas" | "cerveza";
+  id:
+    | "arroz"
+    | "cerveza"
+    | "croquetas"
+    | "huevos"
+    | "jamon_1x50"
+    | "jamon_2h"
+    | "mojitos"
+    | "navajas_zamburinas"
+    | "quesos_clasico"
+    | "quesos_embutidos"
+    | "sushi"
+    | "tortilla"
+    | "vermut";
   enabled: boolean;
   moment: StandMoment;
 }
@@ -30,6 +43,7 @@ export interface CocktailConfig {
   enabled: boolean;
   start?: HHMM;
   end?: HHMM;
+  totalMinutes?: number;
   displacementAfterMinutes?: number;
   /** @deprecated Use EventConfig.stands instead. */
   stands: string[];
@@ -191,6 +205,8 @@ export interface CatalogEventBlock {
   taskCodes?: string[];
   codigosRelacionadosOtrosRoles?: string | null;
   notasOperativas?: string | null;
+  duracionMinima?: number | null;
+  duracionMax?: number | null;
   duracionReferenciaMin?: number | null;
   observacionActa?: string | null;
   over200Adjustment?: string | null;
@@ -225,6 +241,7 @@ export interface CatalogTask {
   over200Scope?: string | null;
   over200Adjustment?: string | null;
   over200Notes?: string | null;
+  requiredLevel?: number;
 }
 
 export interface EventCatalog {
@@ -239,4 +256,59 @@ export interface EventCatalog {
     over200TaskAdjustments?: number;
     over200NonTaskAdjustments?: number;
   };
+}
+
+export interface DeviceSession {
+  deviceId: string;
+  employeeId: string;
+  fullName: string;
+  roles: string[];
+  active: boolean;
+}
+
+export interface AssignableEmployee {
+  employeeId: string;
+  fullName: string;
+  roles: string[];
+  skillLevel: number;
+}
+
+export interface EventStaffAssignment {
+  id: string;
+  eventId: string;
+  employeeId: string;
+  fullName: string;
+  roles: string[];
+  shiftName: "T1" | "T2" | "manual" | string;
+  shiftStart: HHMM;
+  shiftEnd: HHMM;
+  skillLevel: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EventTaskInstance {
+  id: string;
+  eventId: string;
+  blockKey: string;
+  blockId?: string | null;
+  blockLabel?: string | null;
+  taskCode: string;
+  taskName: string;
+  details?: string | null;
+  startTime: HHMM;
+  endTime: HHMM;
+  status: "pending" | "in_progress" | "completed" | "cancelled";
+  requiredLevel: number;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  completedByEmployeeId?: string | null;
+}
+
+export interface WorkerTask extends EventTaskInstance {
+  eventName: string;
+  eventDate: string;
+  shiftName?: string;
+  assignedByBlock?: boolean;
+  assignedDirectly?: boolean;
 }

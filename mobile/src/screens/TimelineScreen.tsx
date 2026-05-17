@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { FileDown } from "lucide-react-native";
+import { FileDown, Save } from "lucide-react-native";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
@@ -18,7 +18,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "Timeline">;
 export function TimelineScreen({ navigation }: Props) {
   const [viewMode, setViewMode] = useState<"grid" | "gantt">("grid");
   const [exportingPdf, setExportingPdf] = useState(false);
-  const { draft, result, error, regenerate } = useTimelineStore();
+  const { draft, result, error, saving, regenerate, saveCurrentWithTasks } = useTimelineStore();
 
   if (!draft || !result) {
     return (
@@ -40,19 +40,40 @@ export function TimelineScreen({ navigation }: Props) {
     }
   }
 
+  async function handleSaveEvent() {
+    regenerate();
+    const saved = await saveCurrentWithTasks();
+    if (saved?.dbId) {
+      Alert.alert("Evento guardado", "El evento quedo guardado y las tareas fueron generadas.");
+    } else {
+      Alert.alert("No se pudo guardar", useTimelineStore.getState().error ?? "Revisa la conexion con Supabase.");
+    }
+  }
+
   return (
     <Screen
       title="Timeline"
       subtitle={`${result.summary.totalBlocks} bloques - ${result.summary.assumptionCount} supuestos`}
       footer={
         <View style={styles.footerButtons}>
-          <PrimaryButton label="Volver" variant="secondary" onPress={() => navigation.navigate("Configurator")} />
+          <PrimaryButton
+            label="Volver"
+            variant="secondary"
+            onPress={() => navigation.reset({ index: 0, routes: [{ name: "AdminPanel" }] })}
+          />
           <PrimaryButton
             label="PDF"
             variant="secondary"
             icon={FileDown}
             loading={exportingPdf}
             onPress={() => void handleExportPdf(draft, result)}
+          />
+          <PrimaryButton
+            label="Guardar evento"
+            variant="secondary"
+            icon={Save}
+            loading={saving}
+            onPress={() => void handleSaveEvent()}
           />
           <PrimaryButton label="Regenerar" onPress={() => regenerate()} />
         </View>

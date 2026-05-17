@@ -13,9 +13,18 @@ type Props = NativeStackScreenProps<RootStackParamList, "Modules">;
 
 const standOptions = [
   { id: "jamon_1x50", label: "Jamon" },
+  { id: "jamon_2h", label: "Jamon 2h" },
   { id: "quesos_clasico", label: "Quesos clasico" },
+  { id: "quesos_embutidos", label: "Quesos y embutidos" },
   { id: "croquetas", label: "Croquetas" },
   { id: "cerveza", label: "Cerveza" },
+  { id: "arroz", label: "Arroz" },
+  { id: "huevos", label: "Huevos" },
+  { id: "mojitos", label: "Mojitos" },
+  { id: "navajas_zamburinas", label: "Navajas/zamburinas" },
+  { id: "sushi", label: "Sushi" },
+  { id: "tortilla", label: "Tortilla" },
+  { id: "vermut", label: "Vermut" },
 ] satisfies { id: EventStand["id"]; label: string }[];
 
 const standMoments: { id: StandMoment; label: string }[] = [

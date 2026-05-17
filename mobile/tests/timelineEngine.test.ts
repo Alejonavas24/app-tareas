@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { fallbackEventCatalog } from "../src/data/catalog";
 import { exampleEvents } from "../src/data/examples";
-import { applyOperationalSchedule, banquetSegmentMinutes, createEmptyEvent, normalizeEventConfig } from "../src/domain/defaults";
+import {
+  DEFAULT_STANDS,
+  applyOperationalSchedule,
+  banquetSegmentMinutes,
+  createEmptyEvent,
+  normalizeEventConfig,
+} from "../src/domain/defaults";
 import { isHHMM } from "../src/domain/time";
 import { generateTimeline } from "../src/domain/timelineEngine";
 
 describe("event catalog", () => {
   it("loads the CSV-derived block/task catalog", () => {
-    expect(fallbackEventCatalog.blocks).toHaveLength(59);
-    expect(fallbackEventCatalog.tasks).toHaveLength(666);
+    expect(fallbackEventCatalog.blocks).toHaveLength(65);
+    expect(fallbackEventCatalog.tasks).toHaveLength(672);
     expect(fallbackEventCatalog.tasks.every((task) => Boolean(task.blockId))).toBe(true);
     expect(fallbackEventCatalog.validation?.tasksWithoutBlock).toBe(0);
   });
@@ -21,6 +27,26 @@ describe("event catalog", () => {
     expect(limonada?.numTareasCamareros).toBe(20);
     expect(affectedTask?.over200Affected).toBe(true);
     expect(affectedTask?.blockId).toBe("B03a");
+  });
+
+  it("adds assignable service blocks for stands that only had setup blocks", () => {
+    const serviceRefs = ["P_HU", "P_JA", "P_JA_2j", "P_NA-ZA", "P_QU_C", "P_QU-EM"];
+
+    serviceRefs.forEach((ref) => {
+      const serviceBlock = fallbackEventCatalog.blocks.find(
+        (block) => block.references === ref && block.moments === "servicio",
+      );
+      expect(serviceBlock?.taskCodes).toHaveLength(1);
+      expect(serviceBlock?.staffMin).toBe(1);
+
+      const serviceTask = fallbackEventCatalog.tasks.find((task) => task.blockId === serviceBlock?.blockId);
+      expect(serviceTask).toMatchObject({
+        referencia: ref,
+        momento: "servicio",
+        responsable: "CAMAREROS",
+        taskName: "Atencion puesto",
+      });
+    });
   });
 });
 
@@ -39,6 +65,52 @@ describe("generateTimeline", () => {
     expect(isHHMM(event.openDoorsTime)).toBe(true);
   });
 
+  it("uses configured cocktail hours for cocktail service blocks", () => {
+    const event = applyOperationalSchedule({
+      ...createEmptyEvent(),
+      cocktail: {
+        ...createEmptyEvent().cocktail,
+        totalMinutes: 90,
+      },
+    });
+    const result = generateTimeline(event);
+
+    expect(event.cocktail.end).toBe("15:30");
+    expect(event.banquet.start).toBe("15:45");
+    expect(result.blocks.find((block) => block.id === "cocktail-service-comida")).toMatchObject({
+      start: "14:00",
+      end: "15:30",
+      durationMinutes: 90,
+    });
+    expect(result.blocks.find((block) => block.id === "stand-P_JA-cocktail-1-service")).toMatchObject({
+      start: "14:00",
+      end: "15:30",
+      durationMinutes: 90,
+    });
+  });
+
+  it("uses the average of catalog minimum and maximum duration for block ranges", () => {
+    const event = applyOperationalSchedule({
+      ...createEmptyEvent(),
+      openDoorsTime: "12:15",
+    });
+    const catalog = {
+      ...fallbackEventCatalog,
+      blocks: fallbackEventCatalog.blocks.map((block) =>
+        block.blockId === "B17"
+          ? { ...block, duracionMinima: 20, duracionMax: 40, duracionReferenciaMin: 125 }
+          : block,
+      ),
+    };
+    const result = generateTimeline(event, catalog);
+
+    expect(result.blocks.find((block) => block.id === "cocktail-previa")).toMatchObject({
+      start: "11:45",
+      end: "12:15",
+      durationMinutes: 30,
+    });
+  });
+
   it("generates ceremony + limonada + cocktail overlaps", () => {
     const event = exampleEvents[0];
     const result = generateTimeline(event);
@@ -55,9 +127,31 @@ describe("generateTimeline", () => {
   it("matches the TORRE sample overlap pattern", () => {
     const result = generateTimeline(exampleEvents[0], fallbackEventCatalog);
 
-    expect(result.blocks.find((block) => block.id === "cocktail-previa")?.start).toBe("13:00");
-    expect(result.blocks.find((block) => block.id === "banquet-previa")?.start).toBe("14:00");
-    expect(result.blocks.find((block) => block.id === "party-previa")?.start).toBe("16:30");
+    expect(result.blocks.find((block) => block.id === "ceremony-previa")).toMatchObject({
+      start: "11:25",
+      end: "12:15",
+      durationMinutes: 50,
+    });
+    expect(result.blocks.find((block) => block.id === "limonada-previa")).toMatchObject({
+      start: "11:37",
+      end: "12:15",
+      durationMinutes: 38,
+    });
+    expect(result.blocks.find((block) => block.id === "briefing")).toMatchObject({
+      start: "12:00",
+      end: "12:15",
+      durationMinutes: 15,
+    });
+    expect(result.blocks.find((block) => block.id === "cocktail-previa")).toMatchObject({
+      start: "11:40",
+      end: "12:15",
+      durationMinutes: 35,
+    });
+    expect(result.blocks.find((block) => block.id === "banquet-previa")?.start).toBe("14:52");
+    expect(result.blocks.find((block) => block.id === "banquet-previa")?.durationMinutes).toBe(23);
+    expect(result.blocks.find((block) => block.id === "party-previa")?.start).toBe("16:55");
+    expect(result.blocks.find((block) => block.id === "party-previa")?.durationMinutes).toBe(45);
+    expect(result.blocks.find((block) => block.id === "banquet-close")?.durationMinutes).toBe(120);
     expect(result.blocks.find((block) => block.id === "resopon-previa")?.start).toBe("21:30");
     expect(result.blocks.find((block) => block.id === "resopon-service")?.start).toBe("21:45");
     expect(result.blocks.find((block) => block.id === "limonada-previa")?.staffMin).toBe(4);
@@ -76,6 +170,7 @@ describe("generateTimeline", () => {
     expect(result.blocks.find((block) => block.id === "party-service-0")?.end).toBe("19:30");
     expect(result.blocks.find((block) => block.id === "party-service-1")?.start).toBe("19:30");
     expect(result.blocks.find((block) => block.id === "party-service-1")?.end).toBe("00:00");
+    expect(result.blocks.find((block) => block.id === "party-close")?.durationMinutes).toBe(168);
     expect(result.blocks.find((block) => block.id === "resopon-service")?.start).toBe("22:30");
     expect(result.assumptions.some((item) => item.id === "banquet-duration-gap")).toBe(true);
   });
@@ -117,15 +212,77 @@ describe("generateTimeline", () => {
     });
     const result = generateTimeline(event);
 
-    expect(result.blocks.find((block) => block.id === "stand-P_CE-ceremony-1-previa")?.start).toBe("12:15");
+    expect(result.blocks.find((block) => block.id === "stand-P_CE-ceremony-1-previa")).toMatchObject({
+      start: "11:30",
+      end: "12:15",
+      durationMinutes: 45,
+    });
     expect(result.blocks.find((block) => block.id === "stand-P_CE-ceremony-1-service")?.start).toBe("13:00");
-    expect(result.blocks.find((block) => block.id === "stand-P_CR-party-1-previa")?.start).toBe("17:15");
-    expect(result.blocks.find((block) => block.id === "stand-P_CR-party-1-previa")?.end).toBe(
-      event.party.segments[0]?.start,
-    );
+    expect(result.blocks.find((block) => block.id === "stand-P_CR-party-1-previa")).toMatchObject({
+      start: "11:30",
+      end: "12:15",
+      durationMinutes: 45,
+    });
     expect(result.blocks.find((block) => block.id === "stand-P_CR-party-1-service")?.end).toBe(
       event.party.segments[event.party.segments.length - 1]?.end,
     );
+  });
+
+  it("uses configured party hours for service blocks only", () => {
+    const event = applyOperationalSchedule({
+      ...createEmptyEvent(),
+      party: {
+        ...createEmptyEvent().party,
+        totalMinutes: 180,
+      },
+      stands: [
+        { id: "jamon_1x50", enabled: false, moment: "cocktail" },
+        { id: "quesos_clasico", enabled: false, moment: "cocktail" },
+        { id: "croquetas", enabled: true, moment: "party" },
+      ],
+    });
+    const result = generateTimeline(event);
+    const partyServiceMinutes = result.blocks
+      .filter((block) => block.parentBlockId === "party" && block.phase === "servicio")
+      .reduce((sum, block) => sum + block.durationMinutes, 0);
+    const lastPartyEnd = event.party.segments[event.party.segments.length - 1]?.end;
+
+    expect(partyServiceMinutes).toBe(180);
+    expect(result.blocks.find((block) => block.id === "stand-P_CR-party-1-service")).toMatchObject({
+      start: event.party.segments[0]?.start,
+      end: lastPartyEnd,
+      durationMinutes: 180,
+    });
+    expect(result.blocks.find((block) => block.id === "party-close")?.durationMinutes).toBe(168);
+  });
+
+  it("creates previa and servicio blocks for every configured stand", () => {
+    const standRefs: Record<(typeof DEFAULT_STANDS)[number]["id"], string> = {
+      arroz: "P_AR",
+      cerveza: "P_CE",
+      croquetas: "P_CR",
+      huevos: "P_HU",
+      jamon_1x50: "P_JA",
+      jamon_2h: "P_JA_2j",
+      mojitos: "P_MO",
+      navajas_zamburinas: "P_NA-ZA",
+      quesos_clasico: "P_QU_C",
+      quesos_embutidos: "P_QU-EM",
+      sushi: "P_SU",
+      tortilla: "P_TO",
+      vermut: "P_VE",
+    };
+    const event = applyOperationalSchedule({
+      ...createEmptyEvent(),
+      stands: DEFAULT_STANDS.map((stand) => ({ ...stand, enabled: true, moment: "cocktail" })),
+    });
+    const result = generateTimeline(event);
+
+    DEFAULT_STANDS.forEach((stand) => {
+      const ref = standRefs[stand.id];
+      expect(result.blocks.some((block) => block.id === `stand-${ref}-cocktail-1-previa`)).toBe(true);
+      expect(result.blocks.some((block) => block.id === `stand-${ref}-cocktail-1-service`)).toBe(true);
+    });
   });
 
   it("derives banquet segment durations from pax", () => {

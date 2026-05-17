@@ -1,0 +1,10 @@
+env: load .env
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_DEVICE_SUPABASE_URL EXPO_PUBLIC_DEVICE_SUPABASE_ANON_KEY
+Starting project at C:\Users\alejo\OneDrive\Escritorio\app-tareas\app-tareas\mobile
+Starting Metro Bundler
+› Opening exp://127.0.0.1:8082 on Medium_Phone
+Waiting on http://localhost:8082
+Logs for your project will appear below.
+Android Bundled 1508ms index.ts (2851 modules)
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/

@@ -6,11 +6,14 @@ import { colors } from "../theme/tokens";
 
 const SLOT_MINUTES = 15;
 const GRID_WINDOW_MINUTES = 240;
+const GANTT_WINDOW_MINUTES = 480;
 
 export async function exportTimelinePdf(draft: EventConfig, result: TimelineResult): Promise<string> {
   const html = buildTimelinePdfHtml(draft, result);
   const printed = await Print.printToFileAsync({
     html,
+    width: 842,
+    height: 595,
     base64: false,
   });
 
@@ -27,8 +30,8 @@ export async function exportTimelinePdf(draft: EventConfig, result: TimelineResu
 
 function buildTimelinePdfHtml(draft: EventConfig, result: TimelineResult): string {
   const blocks = result.blocks;
-  const range = getTimelineRange(blocks, draft.openDoorsTime);
-  const gridSections = buildGridSections(blocks, draft.openDoorsTime, range.minStart, range.maxEnd);
+  const timelineAnchor = blocks[0]?.start ?? draft.openDoorsTime;
+  const range = getTimelineRange(blocks, timelineAnchor);
 
   return `<!doctype html>
 <html>
@@ -42,30 +45,26 @@ function buildTimelinePdfHtml(draft: EventConfig, result: TimelineResult): strin
       color: ${colors.textStrong};
       background: #fff;
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 9px;
+      font-size: 8px;
     }
-    h1, h2, h3, p { margin: 0; }
+    h1, h2, p { margin: 0; }
     .cover {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       gap: 16px;
       border-bottom: 1px solid ${colors.line};
-      padding-bottom: 10px;
-      margin-bottom: 10px;
+      padding-bottom: 6px;
+      margin-bottom: 16px;
     }
     h1 {
-      font-size: 20px;
+      font-size: 16px;
       letter-spacing: 0;
     }
     h2 {
-      font-size: 14px;
-      margin: 14px 0 8px;
-    }
-    h3 {
-      font-size: 11px;
-      margin: 10px 0 6px;
-      color: ${colors.textMedium};
+      color: ${colors.text};
+      font-size: 10px;
+      margin: 0 0 4px 178px;
     }
     .meta {
       display: grid;
@@ -77,95 +76,56 @@ function buildTimelinePdfHtml(draft: EventConfig, result: TimelineResult): strin
     .metric {
       border: 1px solid ${colors.line};
       border-radius: 6px;
-      padding: 5px 7px;
+      padding: 4px 6px;
       white-space: nowrap;
     }
     .metric b {
       display: block;
       color: ${colors.textStrong};
-      font-size: 12px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      table-layout: fixed;
-    }
-    th, td {
-      border: 1px solid ${colors.line};
-      padding: 2px 3px;
-      vertical-align: middle;
-      overflow: hidden;
-    }
-    th {
-      background: ${colors.canvas};
-      color: ${colors.textMedium};
-      font-weight: 700;
-    }
-    .label {
-      width: 170px;
-      font-weight: 700;
-      color: ${colors.textStrong};
-    }
-    .staff {
-      width: 72px;
-      color: ${colors.text};
-    }
-    .phase {
-      width: 58px;
-      color: ${colors.text};
-    }
-    .time {
-      width: 28px;
-      text-align: center;
-      font-size: 7px;
-    }
-    .grid-cell {
-      height: 18px;
-      text-align: center;
-      color: #fff;
-      font-weight: 700;
-      font-size: 7px;
-      line-height: 9px;
+      font-size: 10px;
     }
     .muted {
       color: ${colors.textMuted};
       font-weight: 400;
     }
-    .page-break {
-      break-before: page;
-      page-break-before: always;
-    }
     .gantt {
       position: relative;
       width: 100%;
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 12px;
+    }
+    .gantt + .gantt {
+      break-before: page;
+      page-break-before: always;
     }
     .gantt-row {
       display: grid;
-      grid-template-columns: 188px 1fr;
+      grid-template-columns: 170px 1fr;
       gap: 8px;
-      min-height: 28px;
-      margin-bottom: 5px;
+      min-height: 20px;
+      margin-bottom: 3px;
       break-inside: avoid;
       page-break-inside: avoid;
     }
     .gantt-label {
       border-bottom: 1px solid ${colors.line};
-      padding-bottom: 3px;
+      padding-bottom: 2px;
     }
     .gantt-label b {
       display: block;
-      font-size: 8px;
-      line-height: 10px;
+      font-size: 7px;
+      line-height: 8px;
     }
     .gantt-label span {
       display: block;
       color: ${colors.textMuted};
-      font-size: 7px;
-      line-height: 9px;
+      font-size: 6px;
+      line-height: 8px;
     }
     .track {
       position: relative;
-      height: 24px;
+      height: 18px;
       background: ${colors.canvas};
       border: 1px solid ${colors.line};
       border-radius: 4px;
@@ -173,14 +133,14 @@ function buildTimelinePdfHtml(draft: EventConfig, result: TimelineResult): strin
     }
     .bar {
       position: absolute;
-      top: 4px;
-      height: 14px;
+      top: 3px;
+      height: 11px;
       border-radius: 3px;
       color: #fff;
       font-weight: 700;
-      font-size: 7px;
-      line-height: 14px;
-      padding: 0 4px;
+      font-size: 6px;
+      line-height: 11px;
+      padding: 0 3px;
       white-space: nowrap;
       overflow: hidden;
     }
@@ -192,15 +152,10 @@ function buildTimelinePdfHtml(draft: EventConfig, result: TimelineResult): strin
     }
     .tick-label {
       position: absolute;
-      top: -12px;
+      top: -10px;
       transform: translateX(-50%);
       color: ${colors.textMuted};
-      font-size: 7px;
-    }
-    .notes {
-      margin-top: 10px;
-      color: ${colors.text};
-      line-height: 13px;
+      font-size: 6px;
     }
   </style>
 </head>
@@ -220,15 +175,7 @@ function buildTimelinePdfHtml(draft: EventConfig, result: TimelineResult): strin
     </div>
   </section>
 
-  <h2>Grilla operativa</h2>
-  ${gridSections.join("")}
-
-  <section class="page-break">
-    <h2>Vista Gantt</h2>
-    ${buildGantt(blocks, draft.openDoorsTime, range.minStart, range.maxEnd)}
-  </section>
-
-  ${buildNotes(result)}
+  ${buildPagedGantt(blocks, timelineAnchor, range.minStart, range.maxEnd)}
 </body>
 </html>`;
 }
@@ -292,13 +239,76 @@ function buildGridRow(block: TimelineBlock, anchor: HHMM, ticks: number[]): stri
   </tr>`;
 }
 
+function buildPagedGantt(blocks: TimelineBlock[], anchor: HHMM, minStart: number, maxEnd: number): string {
+  const alignedStart = Math.floor(minStart / SLOT_MINUTES) * SLOT_MINUTES;
+  const alignedEnd = Math.ceil(maxEnd / SLOT_MINUTES) * SLOT_MINUTES;
+  const sections: string[] = [];
+
+  for (let sectionStart = alignedStart; sectionStart < alignedEnd; sectionStart += GANTT_WINDOW_MINUTES) {
+    const sectionEnd = Math.min(sectionStart + GANTT_WINDOW_MINUTES, alignedEnd);
+    sections.push(buildGanttSection(blocks, anchor, sectionStart, sectionEnd));
+  }
+
+  return sections.join("");
+}
+
+function buildGanttSection(blocks: TimelineBlock[], anchor: HHMM, sectionStart: number, sectionEnd: number): string {
+  const span = Math.max(sectionEnd - sectionStart, 60);
+  const tickStep = span <= 360 ? 15 : 30;
+  const ticks = buildTicks(sectionStart, sectionEnd, tickStep);
+  const visibleBlocks = blocks.filter((block) => {
+    const blockStart = toEventMinute(block.start, anchor);
+    const blockEnd = blockStart + diffMinutes(block.start, block.end);
+    return blockStart < sectionEnd && blockEnd > sectionStart;
+  });
+
+  return `<div class="gantt">
+    <h2>${escapeHtml(fromMinutes(sectionStart))} - ${escapeHtml(fromMinutes(sectionEnd))}</h2>
+    <div style="height:12px; position:relative; margin-left:178px;">
+      ${ticks
+        .map((tick) => {
+          const left = ((tick - sectionStart) / span) * 100;
+          return `<span class="tick-label" style="left:${left}%;">${escapeHtml(fromMinutes(tick))}</span>`;
+        })
+        .join("")}
+    </div>
+    ${visibleBlocks
+      .map((block) => {
+        const blockStart = toEventMinute(block.start, anchor);
+        const blockEnd = blockStart + diffMinutes(block.start, block.end);
+        const clippedStart = Math.max(blockStart, sectionStart);
+        const clippedEnd = Math.min(blockEnd, sectionEnd);
+        const left = ((clippedStart - sectionStart) / span) * 100;
+        const width = Math.max(((clippedEnd - clippedStart) / span) * 100, block.phase === "transicion" ? 2 : 4);
+        return `<div class="gantt-row">
+          <div class="gantt-label">
+            <b>${escapeHtml(block.label)}</b>
+            <span>${escapeHtml(`${phaseLabel(block.phase)} | ${block.start}-${block.end} | ${staffLabel(block)}`)}</span>
+          </div>
+          <div class="track">
+            ${ticks
+              .map((tick) => {
+                const tickLeft = ((tick - sectionStart) / span) * 100;
+                return `<span class="tick" style="left:${tickLeft}%;"></span>`;
+              })
+              .join("")}
+            <div class="bar" style="left:${left}%; width:${width}%; background:${blockColor(block)};">
+              ${escapeHtml(`${block.durationMinutes}m`)}
+            </div>
+          </div>
+        </div>`;
+      })
+      .join("")}
+  </div>`;
+}
+
 function buildGantt(blocks: TimelineBlock[], anchor: HHMM, minStart: number, maxEnd: number): string {
   const span = Math.max(maxEnd - minStart, 60);
   const tickStep = span <= 360 ? 15 : 30;
   const ticks = buildTicks(minStart, maxEnd, tickStep);
 
   return `<div class="gantt">
-    <div style="height:14px; position:relative; margin-left:196px;">
+    <div style="height:12px; position:relative; margin-left:178px;">
       ${ticks
         .map((tick) => {
           const left = ((tick - minStart) / span) * 100;

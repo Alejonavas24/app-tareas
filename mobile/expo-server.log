@@ -1,13 +1,24 @@
+
+> mobile@1.0.0 web
+> expo start --web --localhost
+
 env: load .env
-env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_DEVICE_SUPABASE_URL EXPO_PUBLIC_DEVICE_SUPABASE_ANON_KEY
 Starting project at C:\Users\alejo\OneDrive\Escritorio\app-tareas\app-tareas\mobile
 Starting Metro Bundler
-warning: Bundler cache is empty, rebuilding (this may take a minute)
 Waiting on http://localhost:8081
 Logs for your project will appear below.
-Android .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
-Android .\index.ts ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 70.3% (604/756)
-Android Bundled 6508ms index.ts (1028 modules)
-Android .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
-Android Bundled 7682ms index.ts (1 module)
-Android .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 837ms index.ts (2324 modules)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 75ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 71ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 41ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 43ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
