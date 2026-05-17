@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Check, Play } from "lucide-react-native";
+import { Check, CheckCheck, Play } from "lucide-react-native";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
@@ -85,6 +85,7 @@ export function WorkerTasksScreen({ navigation }: Props) {
     loadTasksForEmployee,
     startTaskForEmployee,
     completeTaskForEmployee,
+    completeBlockForWorker,
   } = useOperationsStore();
   const eventGroups = useMemo(() => groupTasksByEvent(workerTasks), [workerTasks]);
   const selectedEvent = eventGroups.find((event) => event.eventId === selectedEventId) ?? eventGroups[0];
@@ -200,8 +201,25 @@ export function WorkerTasksScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.blockHeader}>
-              <Text style={styles.blockTitle}>{selectedBlock.blockLabel}</Text>
-              <Text style={styles.assignment}>{selectedBlock.tasks.length} tareas en este bloque</Text>
+              <View style={styles.rowCopy}>
+                <Text style={styles.blockTitle}>{selectedBlock.blockLabel}</Text>
+                <Text style={styles.assignment}>{selectedBlock.tasks.length} tareas en este bloque</Text>
+              </View>
+              <PrimaryButton
+                label="Terminar bloque"
+                icon={CheckCheck}
+                variant="secondary"
+                loading={saving}
+                disabled={!selectedBlock.tasks.some((task) => task.status === "pending" || task.status === "in_progress")}
+                onPress={() =>
+                  void completeBlockForWorker(
+                    selectedEvent.eventId,
+                    selectedBlock.blockKey,
+                    session.employeeId,
+                    includeCompleted,
+                  )
+                }
+              />
             </View>
 
             {selectedBlock.tasks.map((task) => (
@@ -256,7 +274,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   blockHeader: {
-    gap: 2,
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    justifyContent: "space-between",
   },
   blockNav: {
     flexDirection: "row",

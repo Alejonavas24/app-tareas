@@ -10,6 +10,10 @@ import {
 } from "../src/domain/defaults";
 import { isHHMM } from "../src/domain/time";
 import { generateTimeline } from "../src/domain/timelineEngine";
+import {
+  banquetBaseStaff,
+  resolveBlockStaffRequirement,
+} from "../src/domain/staffing";
 
 describe("event catalog", () => {
   it("loads the CSV-derived block/task catalog", () => {
@@ -51,6 +55,66 @@ describe("event catalog", () => {
 });
 
 describe("generateTimeline", () => {
+  it("computes banquet base staffing from pax", () => {
+    expect(banquetBaseStaff(120)).toBe(8);
+    expect(banquetBaseStaff(129)).toBe(9);
+    expect(banquetBaseStaff(240)).toBe(15);
+  });
+
+  it("resolves all and percentage staffing rules from banquet base", () => {
+    const event = { pax: 129 };
+
+    expect(resolveBlockStaffRequirement(event, {
+      id: "all",
+      label: "Todos",
+      module: "coctel",
+      phase: "servicio",
+      start: "12:00",
+      end: "13:00",
+      durationMinutes: 60,
+      staffingRule: "TODOS_CAM",
+    }).requiredStaffMin).toBe(9);
+
+    expect(resolveBlockStaffRequirement(event, {
+      id: "pct",
+      label: "Comida",
+      module: "coctel",
+      phase: "servicio",
+      start: "12:00",
+      end: "13:00",
+      durationMinutes: 60,
+      staffingRule: "COMIDA = 60%",
+    }).requiredStaffMin).toBe(6);
+
+    expect(resolveBlockStaffRequirement(event, {
+      id: "fixed",
+      label: "Fijo",
+      module: "puesto",
+      phase: "servicio",
+      start: "12:00",
+      end: "13:00",
+      durationMinutes: 60,
+      staffText: "2 montaje / 0 en servicio",
+      staffMin: 2,
+    }).requiredStaffMin).toBe(2);
+  });
+
+  it("forces banquet service blocks to banquet base staffing", () => {
+    const requirement = resolveBlockStaffRequirement({ pax: 240 }, {
+      id: "banquet",
+      label: "Banquete - primero",
+      module: "banquete",
+      phase: "servicio",
+      start: "15:00",
+      end: "15:45",
+      durationMinutes: 45,
+      staffMin: 2,
+      staffingRule: "2 fijos",
+    });
+
+    expect(requirement.requiredStaffMin).toBe(15);
+  });
+
   it("recalculates the full event from a single initial time", () => {
     const event = applyOperationalSchedule({
       ...createEmptyEvent(),
@@ -86,6 +150,24 @@ describe("generateTimeline", () => {
       start: "14:00",
       end: "15:30",
       durationMinutes: 90,
+    });
+  });
+
+  it("regenerates blocks when shifting open doors by ten minutes", () => {
+    const event = applyOperationalSchedule({
+      ...createEmptyEvent(),
+      openDoorsTime: "12:15",
+    });
+    const shifted = applyOperationalSchedule({
+      ...event,
+      openDoorsTime: "12:25",
+    });
+    const result = generateTimeline(shifted);
+
+    expect(shifted.ceremony.start).toBe("13:10");
+    expect(result.blocks.find((block) => block.id === "cocktail-service-comida")).toMatchObject({
+      start: "14:10",
+      end: "15:10",
     });
   });
 

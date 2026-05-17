@@ -121,6 +121,8 @@ export interface TimelineBlock {
   staffText?: string;
   staffMin?: number | null;
   staffMax?: number | null;
+  requiredStaffMin?: number | null;
+  requiredStaffRule?: string;
   staffingRule?: string;
   taskCount?: number | null;
   start: HHMM;
@@ -130,6 +132,33 @@ export interface TimelineBlock {
   assumptions?: string[];
   overlapsWith?: string[];
   colorKey?: string;
+}
+
+export interface StaffingMomentSummary {
+  moment: string;
+  label: string;
+  start?: HHMM;
+  end?: HHMM;
+  peakStaffMin: number;
+  blockCount: number;
+  rules: string[];
+  warnings: string[];
+}
+
+export interface StaffingIntervalSummary {
+  start: HHMM;
+  end: HHMM;
+  requiredStaffMin: number;
+  blockIds: string[];
+  blockLabels: string[];
+}
+
+export interface StaffingSummary {
+  banquetBaseStaff: number;
+  moments: StaffingMomentSummary[];
+  intervals: StaffingIntervalSummary[];
+  peakStaffMin: number;
+  warnings: string[];
 }
 
 export interface TimelineAssumption {
@@ -158,6 +187,7 @@ export interface TimelineResult {
   assumptions: TimelineAssumption[];
   warnings: string[];
   summary: TimelineSummary;
+  staffing: StaffingSummary;
 }
 
 export interface TimelineSnapshot extends TimelineResult {
@@ -180,6 +210,12 @@ export interface TimelineEventSummary {
   warnings?: string[];
   updatedAt?: string;
   createdAt?: string;
+  source?: "timeline" | "crm";
+  plannerEventId?: number;
+  venueName?: string | null;
+  planningStatus?: string | null;
+  inventoryBreak?: boolean;
+  hasTimelineSnapshot?: boolean;
 }
 
 export interface CatalogEventBlock {
@@ -300,6 +336,9 @@ export interface EventTaskInstance {
   endTime: HHMM;
   status: "pending" | "in_progress" | "completed" | "cancelled";
   requiredLevel: number;
+  requiredStaffMin?: number | null;
+  staffingRule?: string | null;
+  numPersonas?: string | null;
   startedAt?: string | null;
   completedAt?: string | null;
   completedByEmployeeId?: string | null;
@@ -311,4 +350,22 @@ export interface WorkerTask extends EventTaskInstance {
   shiftName?: string;
   assignedByBlock?: boolean;
   assignedDirectly?: boolean;
+}
+
+export interface TaskExecutionLog {
+  id: string;
+  eventId: string;
+  taskInstanceId?: string | null;
+  blockKey?: string | null;
+  employeeId?: string | null;
+  action: "start" | "complete" | "complete_block" | "timeline_shift" | string;
+  source: "worker" | "metre" | "admin" | "system" | string;
+  previousStatus?: string | null;
+  newStatus?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  durationSeconds?: number | null;
+  bulkOperationId?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt?: string;
 }

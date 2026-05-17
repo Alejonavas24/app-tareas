@@ -4,6 +4,7 @@ import { ClipboardList, Settings2 } from "lucide-react-native";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
+import { isAdmin, isMetre } from "../domain/assignments";
 import type { RootStackParamList } from "../navigation/types";
 import { useSessionStore } from "../store/sessionStore";
 import { colors, spacing } from "../theme/tokens";
@@ -12,6 +13,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "Home">;
 
 export function HomeScreen({ navigation }: Props) {
   const { session, deviceId } = useSessionStore();
+  const canOpenOpsPanel = isAdmin(session?.roles ?? []) || isMetre(session?.roles ?? []);
 
   return (
     <Screen title="Operativa" subtitle={session ? `Hola, ${session.fullName}` : "Dispositivo validado"}>
@@ -22,12 +24,14 @@ export function HomeScreen({ navigation }: Props) {
             icon={ClipboardList}
             onPress={() => navigation.navigate("WorkerTasks")}
           />
-          <PrimaryButton
-            label="Panel admin"
-            variant="secondary"
-            icon={Settings2}
-            onPress={() => navigation.navigate("AdminPanel")}
-          />
+          {canOpenOpsPanel ? (
+            <PrimaryButton
+              label={isMetre(session?.roles ?? []) && !isAdmin(session?.roles ?? []) ? "Panel metre" : "Panel admin"}
+              variant="secondary"
+              icon={Settings2}
+              onPress={() => navigation.navigate("AdminPanel")}
+            />
+          ) : null}
         </View>
       </SectionCard>
 

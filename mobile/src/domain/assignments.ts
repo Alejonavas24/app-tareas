@@ -20,6 +20,14 @@ export function hasRole(roles: string[], role: string): boolean {
   return roles.map((item) => item.trim().toLowerCase()).includes(expected);
 }
 
+export function isAdmin(roles: string[]): boolean {
+  return hasRole(roles, "admin") || hasRole(roles, "administrador");
+}
+
+export function isMetre(roles: string[]): boolean {
+  return hasRole(roles, "metre");
+}
+
 export function isAssignableWaiter(employee: Pick<AssignableEmployee, "roles">): boolean {
   return hasRole(employee.roles, "camarero");
 }

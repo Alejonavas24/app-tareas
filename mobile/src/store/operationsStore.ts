@@ -3,12 +3,16 @@ import type {
   AssignableEmployee,
   EventStaffAssignment,
   EventTaskInstance,
+  TaskExecutionLog,
   WorkerTask,
 } from "../domain/types";
 import {
   assignEventBlock,
   assignEventTask,
+  completeEventBlock,
+  completeWorkerBlock,
   completeTask,
+  listTaskExecutionLogs,
   listAssignableWaiters,
   listEventStaff,
   listEventTasks,
@@ -22,6 +26,7 @@ interface OperationsState {
   staff: EventStaffAssignment[];
   eventTasks: EventTaskInstance[];
   workerTasks: WorkerTask[];
+  taskLogs: TaskExecutionLog[];
   loading: boolean;
   saving: boolean;
   error?: string;
@@ -35,6 +40,9 @@ interface OperationsState {
   ) => Promise<EventStaffAssignment | undefined>;
   assignBlock: (eventId: string, blockKey: string, staffId: string) => Promise<void>;
   assignTask: (taskInstanceId: string, staffId: string) => Promise<void>;
+  completeBlockForWorker: (eventId: string, blockKey: string, employeeId: string, keepCompleted?: boolean) => Promise<void>;
+  completeBlockForEvent: (eventId: string, blockKey: string, employeeId?: string, source?: "metre" | "admin") => Promise<void>;
+  loadTaskLogs: (eventId: string) => Promise<void>;
   loadTasksForEmployee: (employeeId: string, includeCompleted?: boolean) => Promise<void>;
   startTaskForEmployee: (taskInstanceId: string, employeeId: string) => Promise<void>;
   completeTaskForEmployee: (taskInstanceId: string, employeeId: string, keepCompleted?: boolean) => Promise<void>;
@@ -47,6 +55,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
   staff: [],
   eventTasks: [],
   workerTasks: [],
+  taskLogs: [],
   loading: false,
   saving: false,
 
@@ -114,6 +123,62 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
     }
   },
 
+  async completeBlockForWorker(eventId, blockKey, employeeId, keepCompleted = false) {
+    set({ saving: true, error: undefined });
+    try {
+      await completeWorkerBlock(eventId, blockKey, employeeId);
+      set({
+        workerTasks: keepCompleted
+          ? get().workerTasks.map((task) =>
+              task.eventId === eventId && task.blockKey === blockKey
+                ? {
+                    ...task,
+                    status: "completed",
+                    completedAt: new Date().toISOString(),
+                    completedByEmployeeId: employeeId,
+                  }
+                : task,
+            )
+          : get().workerTasks.filter((task) => !(task.eventId === eventId && task.blockKey === blockKey)),
+        saving: false,
+      });
+    } catch (error) {
+      set({ error: (error as Error).message, saving: false });
+    }
+  },
+
+  async completeBlockForEvent(eventId, blockKey, employeeId, source = "metre") {
+    set({ saving: true, error: undefined });
+    try {
+      await completeEventBlock(eventId, blockKey, employeeId, source);
+      set({
+        eventTasks: get().eventTasks.map((task) =>
+          task.eventId === eventId && task.blockKey === blockKey
+            ? {
+                ...task,
+                status: "completed",
+                completedAt: new Date().toISOString(),
+                completedByEmployeeId: employeeId ?? task.completedByEmployeeId,
+              }
+            : task,
+        ),
+        saving: false,
+      });
+      await get().loadTaskLogs(eventId);
+    } catch (error) {
+      set({ error: (error as Error).message, saving: false });
+    }
+  },
+
+  async loadTaskLogs(eventId) {
+    set({ loading: true, error: undefined });
+    try {
+      set({ taskLogs: await listTaskExecutionLogs(eventId), loading: false });
+    } catch (error) {
+      set({ error: (error as Error).message, loading: false });
+    }
+  },
+
   async loadTasksForEmployee(employeeId, includeCompleted = false) {
     set({ loading: true, error: undefined });
     try {
@@ -169,6 +234,6 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
   },
 
   clearEventContext() {
-    set({ staff: [], eventTasks: [], error: undefined });
+    set({ staff: [], eventTasks: [], taskLogs: [], error: undefined });
   },
 }));

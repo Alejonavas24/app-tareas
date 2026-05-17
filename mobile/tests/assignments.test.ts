@@ -3,7 +3,9 @@ import { fallbackEventCatalog } from "../src/data/catalog";
 import { createEmptyEvent } from "../src/domain/defaults";
 import {
   canCompleteTask,
+  isAdmin,
   isAssignableWaiter,
+  isMetre,
   parseRoles,
   proposeShift,
   rangesOverlap,
@@ -16,6 +18,8 @@ describe("assignment helpers", () => {
     expect(parseRoles("camarero, barra")).toEqual(["camarero", "barra"]);
     expect(isAssignableWaiter({ roles: parseRoles("Barra, CAMARERO") })).toBe(true);
     expect(isAssignableWaiter({ roles: parseRoles("cocina") })).toBe(false);
+    expect(isMetre(parseRoles("camarero, Metre"))).toBe(true);
+    expect(isAdmin(parseRoles("administrador"))).toBe(true);
   });
 
   it("checks task difficulty against employee skill level", () => {

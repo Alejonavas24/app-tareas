@@ -293,3 +293,10 @@ export function duplicateEventConfig(event: EventConfig): EventConfig {
     name: `${event.name} copia`,
   });
 }
+
+export function shiftEventConfig(event: EventConfig, minutes: number): EventConfig {
+  return applyOperationalSchedule({
+    ...event,
+    openDoorsTime: addMinutes(event.openDoorsTime, minutes),
+  });
+}

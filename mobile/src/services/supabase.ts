@@ -8,6 +8,7 @@ import type {
   EventCatalog,
   EventStaffAssignment,
   EventTaskInstance,
+  TaskExecutionLog,
   TimelineEventSummary,
   TimelineSnapshot,
   WorkerTask,
@@ -61,13 +62,77 @@ function ensureDeviceEnv() {
   }
 }
 
+function isMissingRpcError(error: { message?: string; code?: string } | null | undefined): boolean {
+  return error?.code === "PGRST202" || (error?.message ?? "").includes("Could not find the function");
+}
+
 export async function listTimelineEvents(): Promise<TimelineEventSummary[]> {
   ensureEnv();
-  const { data, error } = await supabase.rpc("list_timeline_events");
-  if (error) {
-    throw new Error(error.message);
+  const [timelineResult, plannerResult] = await Promise.all([
+    supabase.rpc("list_timeline_events"),
+    supabase.rpc("list_planner_events", {
+      p_date_from: dateOffset(-30),
+      p_date_to: dateOffset(365),
+    }),
+  ]);
+
+  if (plannerResult.error) {
+    throw new Error(plannerResult.error.message);
   }
-  return (data ?? []) as TimelineEventSummary[];
+
+  const savedEvents = ((timelineResult.data ?? []) as TimelineEventSummary[]).map((event) => ({
+    ...event,
+    source: "timeline" as const,
+    hasTimelineSnapshot: true,
+  }));
+  const savedByExternalId = new Map(savedEvents.map((event) => [event.externalId, event]));
+
+  return ((plannerResult.data ?? []) as PlannerEventRow[])
+    .map((row) => mapPlannerEvent(row, savedByExternalId.get(row.external_event_id)))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+}
+
+function dateOffset(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+type PlannerEventRow = {
+  planner_evento_id: number;
+  external_event_id: string;
+  nombre_evento: string | null;
+  fecha_evento: string;
+  espacio_nombre: string | null;
+  estado_planificacion: string | null;
+  ruptura_inventario: boolean | null;
+  invitados: number | null;
+};
+
+function mapPlannerEvent(
+  row: PlannerEventRow,
+  saved?: TimelineEventSummary,
+): TimelineEventSummary {
+  const externalId = row.external_event_id || `planner:${row.planner_evento_id}`;
+  return {
+    dbId: saved?.dbId ?? `crm:${row.planner_evento_id}`,
+    externalId,
+    name: row.nombre_evento ?? "Evento CRM",
+    date: row.fecha_evento,
+    pax: Math.max(row.invitados ?? saved?.pax ?? 1, 1),
+    openDoorsTime: saved?.openDoorsTime ?? "12:15",
+    endTime: saved?.endTime,
+    summary: saved?.summary,
+    warnings: saved?.warnings,
+    updatedAt: saved?.updatedAt,
+    createdAt: saved?.createdAt,
+    source: "crm",
+    plannerEventId: row.planner_evento_id,
+    venueName: row.espacio_nombre,
+    planningStatus: row.estado_planificacion,
+    inventoryBreak: row.ruptura_inventario ?? false,
+    hasTimelineSnapshot: Boolean(saved),
+  };
 }
 
 export async function getEventCatalog(pax?: number): Promise<EventCatalog> {
@@ -295,6 +360,9 @@ export async function saveCurrentEventWithTasks(
     responsable: task.responsable ?? null,
     dependency_code: task.dependencyCode ?? null,
     required_level: task.requiredLevel,
+    required_staff_min: task.requiredStaffMin ?? null,
+    staffing_rule: task.staffingRule ?? null,
+    num_personas: task.numPersonas ?? null,
   })) : [];
 
   if (taskPayload.length > 0) {
@@ -317,6 +385,47 @@ export async function saveCurrentEventWithTasks(
     }
   }
   return getTimelineEvent(saved.dbId);
+}
+
+function taskPayloadFromSnapshot(snapshot: TimelineSnapshot, catalog?: EventCatalog) {
+  return catalog ? previewMaterializedTasks(snapshot.blocks ?? [], catalog).map((task) => ({
+    block_key: task.blockKey,
+    block_id: task.blockId,
+    task_code: task.taskCode,
+    task_sort: task.taskSort ?? null,
+    task_name: task.taskName,
+    details: task.details ?? null,
+    start_time: task.startTime,
+    end_time: task.endTime,
+    responsable: task.responsable ?? null,
+    dependency_code: task.dependencyCode ?? null,
+    required_level: task.requiredLevel,
+    required_staff_min: task.requiredStaffMin ?? null,
+    staffing_rule: task.staffingRule ?? null,
+    num_personas: task.numPersonas ?? null,
+  })) : [];
+}
+
+export async function shiftEventTimeline(
+  snapshot: TimelineSnapshot,
+  catalog: EventCatalog | undefined,
+  options: { minutes: number; employeeId?: string },
+): Promise<TimelineSnapshot> {
+  ensureEnv();
+  if (!snapshot.dbId) {
+    throw new Error("Guarda el evento antes de mover el timeline.");
+  }
+  const { data, error } = await supabase.rpc("shift_event_timeline_from_payload", {
+    p_event_id: snapshot.dbId,
+    p_payload: snapshot,
+    p_tasks: taskPayloadFromSnapshot(snapshot, catalog),
+    p_minutes: options.minutes,
+    p_employee_id: options.employeeId ?? null,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data as TimelineSnapshot;
 }
 
 export async function deleteTimelineEvent(dbId: string): Promise<void> {
@@ -514,6 +623,48 @@ export async function completeTask(taskInstanceId: string, employeeId: string): 
   if (error) {
     throw new Error(error.message);
   }
+}
+
+export async function completeWorkerBlock(eventId: string, blockKey: string, employeeId: string): Promise<void> {
+  ensureEnv();
+  const { error } = await supabase.rpc("complete_worker_block", {
+    p_event_id: eventId,
+    p_block_key: blockKey,
+    p_employee_id: employeeId,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function completeEventBlock(
+  eventId: string,
+  blockKey: string,
+  employeeId: string | undefined,
+  source: "metre" | "admin" = "metre",
+): Promise<void> {
+  ensureEnv();
+  const { error } = await supabase.rpc("complete_event_block", {
+    p_event_id: eventId,
+    p_block_key: blockKey,
+    p_employee_id: employeeId ?? null,
+    p_source: source,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function listTaskExecutionLogs(eventId: string): Promise<TaskExecutionLog[]> {
+  ensureEnv();
+  const { data, error } = await supabase.rpc("list_task_execution_logs", { p_event_id: eventId });
+  if (error) {
+    if (isMissingRpcError(error)) {
+      return [];
+    }
+    throw new Error(error.message);
+  }
+  return (data ?? []) as TaskExecutionLog[];
 }
 
 export async function startTask(taskInstanceId: string, employeeId: string): Promise<void> {

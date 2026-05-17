@@ -12,6 +12,9 @@ export interface MaterializedTaskPreview {
   responsable?: string | null;
   dependencyCode?: string | null;
   requiredLevel: number;
+  requiredStaffMin?: number | null;
+  staffingRule?: string | null;
+  numPersonas?: string | null;
 }
 
 export function previewMaterializedTasks(blocks: TimelineBlock[], catalog: EventCatalog): MaterializedTaskPreview[] {
@@ -34,6 +37,9 @@ export function previewMaterializedTasks(blocks: TimelineBlock[], catalog: Event
         responsable: task.responsable ?? null,
         dependencyCode: task.dependencyCode ?? null,
         requiredLevel: task.requiredLevel ?? 0,
+        requiredStaffMin: task.staffMin ?? block.requiredStaffMin ?? null,
+        staffingRule: task.numPersonas ?? block.requiredStaffRule ?? block.staffingRule ?? null,
+        numPersonas: task.numPersonas ?? null,
       }));
 
     return catalogTasks.length > 0 ? catalogTasks : mockTasksForBlock(block);
@@ -56,5 +62,8 @@ function mockTasksForBlock(block: TimelineBlock): MaterializedTaskPreview[] {
     responsable: "CAMAREROS",
     dependencyCode: index === 0 ? null : `${block.id}-MOCK-${index}`,
     requiredLevel: 0,
+    requiredStaffMin: block.requiredStaffMin ?? null,
+    staffingRule: block.requiredStaffRule ?? block.staffingRule ?? null,
+    numPersonas: block.staffText ?? null,
   }));
 }

@@ -5,7 +5,6 @@ import { CalendarDays, Copy, Plus, Trash2 } from "lucide-react-native";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
-import { exampleEvents } from "../data/examples";
 import type { RootStackParamList } from "../navigation/types";
 import { useTimelineStore } from "../store/timelineStore";
 import { colors, spacing } from "../theme/tokens";
@@ -13,7 +12,7 @@ import { colors, spacing } from "../theme/tokens";
 type Props = NativeStackScreenProps<RootStackParamList, "Events">;
 
 export function EventListScreen({ navigation }: Props) {
-  const { events, loading, error, loadEvents, createDraft, openEvent, openExample, deleteEvent } =
+  const { events, loading, error, loadEvents, createDraft, openEvent, deleteEvent } =
     useTimelineStore();
 
   useEffect(() => {
@@ -31,7 +30,7 @@ export function EventListScreen({ navigation }: Props) {
   return (
     <Screen
       title="Linea de tiempo"
-      subtitle="Eventos operativos guardados en Supabase Cloud"
+      subtitle="Eventos sincronizados desde CRM"
       footer={
         <PrimaryButton
           label="Crear evento"
@@ -45,34 +44,13 @@ export function EventListScreen({ navigation }: Props) {
     >
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <SectionCard title="Ejemplos" caption="Carga una referencia del paquete para validar el motor.">
-        {exampleEvents.map((event, index) => (
-          <View key={event.id} style={styles.exampleRow}>
-            <View style={styles.rowCopy}>
-              <Text style={styles.eventName}>{event.name}</Text>
-              <Text style={styles.meta}>
-                {event.date} · {event.pax} pax
-              </Text>
-            </View>
-            <PrimaryButton
-              label="Abrir"
-              variant="secondary"
-              onPress={() => {
-                openExample(index);
-                navigation.navigate("BaseEvent");
-              }}
-            />
-          </View>
-        ))}
-      </SectionCard>
-
-      <SectionCard title="Nube" caption="Lista actual desde tareas.timeline_events.">
+      <SectionCard title="CRM" caption="Lista actual desde list_planner_events.">
         <ScrollView
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadEvents} tintColor={colors.primary} />}
           scrollEnabled={false}
           contentContainerStyle={styles.list}
         >
-          {events.length === 0 ? <Text style={styles.empty}>Aun no hay eventos guardados.</Text> : null}
+          {events.length === 0 ? <Text style={styles.empty}>No hay eventos CRM en el rango actual.</Text> : null}
           {events.map((event) => (
             <View key={event.dbId} style={styles.eventCard}>
               <View style={styles.eventHeader}>
@@ -82,8 +60,16 @@ export function EventListScreen({ navigation }: Props) {
                 <View style={styles.rowCopy}>
                   <Text style={styles.eventName}>{event.name}</Text>
                   <Text style={styles.meta}>
-                    {event.date} · {event.pax} pax · {event.summary?.totalBlocks ?? 0} bloques
+                    {event.date} - {event.pax} pax
+                    {event.venueName ? ` - ${event.venueName}` : ""}
+                    {event.hasTimelineSnapshot ? ` - ${event.summary?.totalBlocks ?? 0} bloques` : " - sin timeline"}
                   </Text>
+                  {event.planningStatus ? (
+                    <Text style={event.inventoryBreak ? styles.warningMeta : styles.meta}>
+                      {event.planningStatus}
+                      {event.inventoryBreak ? " - ruptura inventario" : ""}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
               <View style={styles.actions}>
@@ -102,8 +88,9 @@ export function EventListScreen({ navigation }: Props) {
                   label="Borrar"
                   variant="ghost"
                   icon={Trash2}
+                  disabled={!event.hasTimelineSnapshot}
                   onPress={() =>
-                    Alert.alert("Borrar evento", `¿Eliminar ${event.name}?`, [
+                    Alert.alert("Borrar evento", `Eliminar ${event.name}?`, [
                       { text: "Cancelar", style: "cancel" },
                       { text: "Borrar", style: "destructive", onPress: () => void deleteEvent(event.dbId) },
                     ])
@@ -121,12 +108,6 @@ export function EventListScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   list: {
     gap: spacing.md,
-  },
-  exampleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: spacing.md,
-    justifyContent: "space-between",
   },
   eventCard: {
     gap: spacing.md,
@@ -161,6 +142,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  warningMeta: {
+    color: colors.warning,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    marginTop: 2,
+  },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -177,4 +164,3 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
-

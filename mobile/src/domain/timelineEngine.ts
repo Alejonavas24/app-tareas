@@ -1,5 +1,6 @@
 import { fallbackEventCatalog } from "../data/catalog";
 import { normalizeEventConfig } from "./defaults";
+import { annotateBlocksWithStaffing, computeStaffingSummary } from "./staffing";
 import {
   addMinutes,
   diffMinutes,
@@ -957,13 +958,13 @@ export function generateTimeline(input: EventConfig, catalog: EventCatalog = fal
     );
   }
 
-  const sortedBlocks = computeOverlaps(
+  const sortedBlocks = annotateBlocksWithStaffing(event, computeOverlaps(
     blocks.sort((a, b) => {
       const time = sortHHMM(a.start, b.start, event.openDoorsTime);
       return time === 0 ? a.label.localeCompare(b.label) : time;
     }),
     event.openDoorsTime,
-  ).map(annotateNotes);
+  ).map(annotateNotes));
 
   const startsAt = sortedBlocks[0]?.start;
   const maxEnd = sortedBlocks.reduce(
@@ -986,5 +987,6 @@ export function generateTimeline(input: EventConfig, catalog: EventCatalog = fal
       warningCount: warnings.length,
       has200PaxAdjustments: event.pax > 200,
     },
+    staffing: computeStaffingSummary(event, sortedBlocks),
   };
 }
