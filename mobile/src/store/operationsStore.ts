@@ -9,6 +9,8 @@ import type {
 import {
   assignEventBlock,
   assignEventTask,
+  autoAssignEventBlocksForEvent,
+  autoAssignEventBlocksForStaff,
   completeEventBlock,
   completeWorkerBlock,
   completeTask,
@@ -39,6 +41,8 @@ interface OperationsState {
     shift: Pick<EventStaffAssignment, "shiftName" | "shiftStart" | "shiftEnd">,
   ) => Promise<EventStaffAssignment | undefined>;
   assignBlock: (eventId: string, blockKey: string, staffId: string) => Promise<void>;
+  autoAssignBlocksForStaff: (eventId: string, staffId: string) => Promise<void>;
+  autoAssignBlocksForEvent: (eventId: string) => Promise<void>;
   assignTask: (taskInstanceId: string, staffId: string) => Promise<void>;
   completeBlockForWorker: (eventId: string, blockKey: string, employeeId: string, keepCompleted?: boolean) => Promise<void>;
   completeBlockForEvent: (eventId: string, blockKey: string, employeeId?: string, source?: "metre" | "admin") => Promise<void>;
@@ -90,6 +94,7 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
     set({ saving: true, error: undefined });
     try {
       const saved = await upsertEventStaff(eventId, employee, shift);
+      await autoAssignEventBlocksForStaff(eventId, saved.id);
       set({
         staff: [...get().staff.filter((item) => item.employeeId !== saved.employeeId), saved].sort((a, b) =>
           a.fullName.localeCompare(b.fullName),
@@ -107,6 +112,26 @@ export const useOperationsStore = create<OperationsState>((set, get) => ({
     set({ saving: true, error: undefined });
     try {
       await assignEventBlock(eventId, blockKey, staffId);
+      set({ saving: false });
+    } catch (error) {
+      set({ error: (error as Error).message, saving: false });
+    }
+  },
+
+  async autoAssignBlocksForStaff(eventId, staffId) {
+    set({ saving: true, error: undefined });
+    try {
+      await autoAssignEventBlocksForStaff(eventId, staffId);
+      set({ saving: false });
+    } catch (error) {
+      set({ error: (error as Error).message, saving: false });
+    }
+  },
+
+  async autoAssignBlocksForEvent(eventId) {
+    set({ saving: true, error: undefined });
+    try {
+      await autoAssignEventBlocksForEvent(eventId);
       set({ saving: false });
     } catch (error) {
       set({ error: (error as Error).message, saving: false });

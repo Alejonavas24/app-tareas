@@ -2,6 +2,7 @@ export type RootStackParamList = {
   DeviceGate: undefined;
   Home: undefined;
   AdminPanel: undefined;
+  MetrePanel: undefined;
   WorkerTasks: undefined;
   Configurator: undefined;
   Events: undefined;

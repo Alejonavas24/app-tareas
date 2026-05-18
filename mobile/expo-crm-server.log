@@ -8,3 +8,98 @@ Starting project at C:\Users\alejo\OneDrive\Escritorio\app-tareas\app-tareas\mob
 Starting Metro Bundler
 Waiting on http://localhost:8081
 Logs for your project will appear below.
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 1411ms index.ts (2295 modules)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 472ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 57ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Unable to resolve "./src/screens/MetrePanelScreen" from "App.tsx"
+[0m [90m 11 |[39m [36mimport[39m { [33mDeviceGateScreen[39m } [36mfrom[39m [32m"./src/screens/DeviceGateScreen"[39m[33m;[39m
+ [90m 12 |[39m [36mimport[39m { [33mHomeScreen[39m } [36mfrom[39m [32m"./src/screens/HomeScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 13 |[39m [36mimport[39m { [33mMetrePanelScreen[39m } [36mfrom[39m [32m"./src/screens/MetrePanelScreen"[39m[33m;[39m
+ [90m    |[39m                                   [31m[1m^[22m[39m
+ [90m 14 |[39m [36mimport[39m { [33mTimelineScreen[39m } [36mfrom[39m [32m"./src/screens/TimelineScreen"[39m[33m;[39m
+ [90m 15 |[39m [36mimport[39m { [33mWorkerTasksScreen[39m } [36mfrom[39m [32m"./src/screens/WorkerTasksScreen"[39m[33m;[39m
+ [90m 16 |[39m [36mimport[39m { colors } [36mfrom[39m [32m"./src/theme/tokens"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.tsx
+ | import "./src/screens/MetrePanelScreen"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+
+Unable to resolve "./src/screens/MetrePanelScreen" from "App.tsx"
+[0m [90m 11 |[39m [36mimport[39m { [33mDeviceGateScreen[39m } [36mfrom[39m [32m"./src/screens/DeviceGateScreen"[39m[33m;[39m
+ [90m 12 |[39m [36mimport[39m { [33mHomeScreen[39m } [36mfrom[39m [32m"./src/screens/HomeScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 13 |[39m [36mimport[39m { [33mMetrePanelScreen[39m } [36mfrom[39m [32m"./src/screens/MetrePanelScreen"[39m[33m;[39m
+ [90m    |[39m                                   [31m[1m^[22m[39m
+ [90m 14 |[39m [36mimport[39m { [33mTimelineScreen[39m } [36mfrom[39m [32m"./src/screens/TimelineScreen"[39m[33m;[39m
+ [90m 15 |[39m [36mimport[39m { [33mWorkerTasksScreen[39m } [36mfrom[39m [32m"./src/screens/WorkerTasksScreen"[39m[33m;[39m
+ [90m 16 |[39m [36mimport[39m { colors } [36mfrom[39m [32m"./src/theme/tokens"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.tsx
+ | import "./src/screens/MetrePanelScreen"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+
+Unable to resolve "./src/screens/MetrePanelScreen" from "App.tsx"
+[0m [90m 11 |[39m [36mimport[39m { [33mDeviceGateScreen[39m } [36mfrom[39m [32m"./src/screens/DeviceGateScreen"[39m[33m;[39m
+ [90m 12 |[39m [36mimport[39m { [33mHomeScreen[39m } [36mfrom[39m [32m"./src/screens/HomeScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 13 |[39m [36mimport[39m { [33mMetrePanelScreen[39m } [36mfrom[39m [32m"./src/screens/MetrePanelScreen"[39m[33m;[39m
+ [90m    |[39m                                   [31m[1m^[22m[39m
+ [90m 14 |[39m [36mimport[39m { [33mTimelineScreen[39m } [36mfrom[39m [32m"./src/screens/TimelineScreen"[39m[33m;[39m
+ [90m 15 |[39m [36mimport[39m { [33mWorkerTasksScreen[39m } [36mfrom[39m [32m"./src/screens/WorkerTasksScreen"[39m[33m;[39m
+ [90m 16 |[39m [36mimport[39m { colors } [36mfrom[39m [32m"./src/theme/tokens"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.tsx
+ | import "./src/screens/MetrePanelScreen"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+
+Unable to resolve "./src/screens/MetrePanelScreen" from "App.tsx"
+[0m [90m 11 |[39m [36mimport[39m { [33mDeviceGateScreen[39m } [36mfrom[39m [32m"./src/screens/DeviceGateScreen"[39m[33m;[39m
+ [90m 12 |[39m [36mimport[39m { [33mHomeScreen[39m } [36mfrom[39m [32m"./src/screens/HomeScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 13 |[39m [36mimport[39m { [33mMetrePanelScreen[39m } [36mfrom[39m [32m"./src/screens/MetrePanelScreen"[39m[33m;[39m
+ [90m    |[39m                                   [31m[1m^[22m[39m
+ [90m 14 |[39m [36mimport[39m { [33mTimelineScreen[39m } [36mfrom[39m [32m"./src/screens/TimelineScreen"[39m[33m;[39m
+ [90m 15 |[39m [36mimport[39m { [33mWorkerTasksScreen[39m } [36mfrom[39m [32m"./src/screens/WorkerTasksScreen"[39m[33m;[39m
+ [90m 16 |[39m [36mimport[39m { colors } [36mfrom[39m [32m"./src/theme/tokens"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.tsx
+ | import "./src/screens/MetrePanelScreen"
+
+ index.ts
+ | import "./App"
+
+ 
+ | import "./index.ts"
+
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 68ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 56ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console

@@ -10,6 +10,7 @@ import { AdminPanelScreen } from "./src/screens/AdminPanelScreen";
 import { ConfiguratorScreen } from "./src/screens/ConfiguratorScreen";
 import { DeviceGateScreen } from "./src/screens/DeviceGateScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
+import { MetrePanelScreen } from "./src/screens/MetrePanelScreen";
 import { TimelineScreen } from "./src/screens/TimelineScreen";
 import { WorkerTasksScreen } from "./src/screens/WorkerTasksScreen";
 import { colors } from "./src/theme/tokens";
@@ -57,6 +58,7 @@ export default function App() {
             <Stack.Screen name="DeviceGate" component={DeviceGateScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="AdminPanel" component={AdminPanelScreen} />
+            <Stack.Screen name="MetrePanel" component={MetrePanelScreen} />
             <Stack.Screen name="WorkerTasks" component={WorkerTasksScreen} />
             <Stack.Screen name="Configurator" component={ConfiguratorScreen} />
             <Stack.Screen name="Timeline" component={TimelineScreen} />

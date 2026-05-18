@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { Alert, Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { CheckCheck, Clock, Save } from "lucide-react-native";
-import { Field } from "../components/Field";
+import { Save } from "lucide-react-native";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { Screen } from "../components/Screen";
 import { SectionCard } from "../components/SectionCard";
-import { isAdmin, isMetre, proposeShift } from "../domain/assignments";
+import { isAdmin, proposeShift } from "../domain/assignments";
 import type { AssignableEmployee, EventStaffAssignment } from "../domain/types";
 import type { RootStackParamList } from "../navigation/types";
 import { useOperationsStore } from "../store/operationsStore";
@@ -17,13 +16,10 @@ import { colors, spacing } from "../theme/tokens";
 type Props = NativeStackScreenProps<RootStackParamList, "AdminPanel">;
 
 export function AdminPanelScreen({ navigation }: Props) {
-  const [manualShiftMinutes, setManualShiftMinutes] = useState("10");
   const { width } = useWindowDimensions();
   const { session } = useSessionStore();
   const sessionRoles = session?.roles ?? [];
   const adminAccess = isAdmin(sessionRoles);
-  const metreAccess = isMetre(sessionRoles);
-  const metreOnly = metreAccess && !adminAccess;
   const wideWeb = Platform.OS === "web" && width >= 900;
   const {
     draft,
@@ -38,7 +34,6 @@ export function AdminPanelScreen({ navigation }: Props) {
     openEvent,
     regenerate,
     saveCurrentWithTasks,
-    shiftTimeline,
   } = useTimelineStore();
   const {
     waiters,
@@ -55,8 +50,8 @@ export function AdminPanelScreen({ navigation }: Props) {
     clearEventContext,
     addStaff,
     assignBlock,
+    autoAssignBlocksForEvent,
     assignTask,
-    completeBlockForEvent,
   } = useOperationsStore();
 
   useEffect(() => {
@@ -78,14 +73,6 @@ export function AdminPanelScreen({ navigation }: Props) {
     }
   }, [dbId, loadEventTasks, loadStaff, loadTaskLogs]);
 
-  const tasksByBlock = useMemo(() => {
-    const groups = new Map<string, typeof eventTasks>();
-    eventTasks.forEach((task) => {
-      groups.set(task.blockKey, [...(groups.get(task.blockKey) ?? []), task]);
-    });
-    return groups;
-  }, [eventTasks]);
-
   if (!draft || !result) {
     return (
       <Screen title="Panel admin">
@@ -94,7 +81,7 @@ export function AdminPanelScreen({ navigation }: Props) {
     );
   }
 
-  if (session && !adminAccess && !metreAccess) {
+  if (session && !adminAccess) {
     return (
       <Screen title="Panel admin">
         <Text style={styles.empty}>Tu rol actual no tiene acceso al panel operativo.</Text>
@@ -106,6 +93,7 @@ export function AdminPanelScreen({ navigation }: Props) {
     regenerate();
     const saved = await saveCurrentWithTasks();
     if (saved?.dbId) {
+      await autoAssignBlocksForEvent(saved.dbId);
       await loadStaff(saved.dbId);
       await loadEventTasks(saved.dbId);
       await loadTaskLogs(saved.dbId);
@@ -118,9 +106,13 @@ export function AdminPanelScreen({ navigation }: Props) {
   async function handleOpenEvent(eventDbId: string) {
     clearEventContext();
     await openEvent(eventDbId);
-    await loadStaff(eventDbId);
-    await loadEventTasks(eventDbId);
-    await loadTaskLogs(eventDbId);
+    const openedDbId = useTimelineStore.getState().dbId;
+    if (openedDbId) {
+      await autoAssignBlocksForEvent(openedDbId);
+      await loadStaff(openedDbId);
+      await loadEventTasks(openedDbId);
+      await loadTaskLogs(openedDbId);
+    }
   }
 
   function handleNewEvent() {
@@ -148,31 +140,6 @@ export function AdminPanelScreen({ navigation }: Props) {
     await assignBlock(eventId, blockKey, assignment.id);
   }
 
-  async function handleCompleteEventBlock(blockKey: string) {
-    const eventId = useTimelineStore.getState().dbId;
-    if (!eventId) {
-      Alert.alert("Guarda primero", "Guarda el evento antes de completar bloques.");
-      return;
-    }
-    await completeBlockForEvent(eventId, blockKey, session?.employeeId, metreOnly ? "metre" : "admin");
-    await loadEventTasks(eventId);
-  }
-
-  async function handleShift(minutes: number) {
-    if (!Number.isFinite(minutes) || minutes === 0) {
-      Alert.alert("Minutos invalidos", "Usa un numero distinto de 0.");
-      return;
-    }
-    const saved = await shiftTimeline(minutes, session?.employeeId);
-    if (saved?.dbId) {
-      await loadEventTasks(saved.dbId);
-      await loadTaskLogs(saved.dbId);
-      Alert.alert("Timeline movido", `El evento se movio ${minutes > 0 ? "+" : ""}${minutes} minutos.`);
-    } else {
-      Alert.alert("No se pudo mover", useTimelineStore.getState().error ?? "Revisa la conexion con Supabase.");
-    }
-  }
-
   const eventId = dbId;
   const unassignedWaiters = waiters.filter(
     (waiter) => !staff.some((assignment) => assignment.employeeId === waiter.employeeId),
@@ -182,19 +149,17 @@ export function AdminPanelScreen({ navigation }: Props) {
 
   return (
     <Screen
-      title={metreOnly ? "Panel metre" : "Panel admin"}
+      title="Panel admin"
       subtitle={eventId ? `Evento guardado: ${draft.name}` : "Guarda el evento para operar tareas."}
       footer={
         <View style={styles.footer}>
           <PrimaryButton label="Volver" variant="secondary" onPress={() => navigation.navigate("Home")} />
-          {!metreOnly ? (
-            <PrimaryButton
-              label="Guardar evento"
-              icon={Save}
-              loading={savingEvent}
-              onPress={() => void handleSaveEvent()}
-            />
-          ) : null}
+          <PrimaryButton
+            label="Guardar evento"
+            icon={Save}
+            loading={savingEvent}
+            onPress={() => void handleSaveEvent()}
+          />
         </View>
       }
     >
@@ -202,7 +167,7 @@ export function AdminPanelScreen({ navigation }: Props) {
 
       <SectionCard title="Eventos guardados" caption={loadingEvents ? "Cargando eventos..." : undefined}>
         <View style={styles.inlineActions}>
-          {!metreOnly ? <PrimaryButton label="Nuevo" variant="secondary" onPress={handleNewEvent} /> : null}
+          <PrimaryButton label="Nuevo" variant="secondary" onPress={handleNewEvent} />
           <PrimaryButton label="Refrescar" variant="secondary" onPress={() => void loadEvents()} />
         </View>
         {events.length === 0 ? <Text style={styles.empty}>Aun no hay eventos guardados.</Text> : null}
@@ -230,9 +195,7 @@ export function AdminPanelScreen({ navigation }: Props) {
           {draft.date} - {draft.pax} pax - {result.summary.totalBlocks} bloques - {eventTasks.length} tareas
         </Text>
         <View style={styles.inlineActions}>
-          {!metreOnly ? (
-            <PrimaryButton label="Configurar" variant="secondary" onPress={() => navigation.navigate("Configurator")} />
-          ) : null}
+          <PrimaryButton label="Configurar" variant="secondary" onPress={() => navigation.navigate("Configurator")} />
           <PrimaryButton label="Diagrama" variant="secondary" onPress={() => navigation.navigate("Timeline")} />
         </View>
       </SectionCard>
@@ -260,68 +223,7 @@ export function AdminPanelScreen({ navigation }: Props) {
         ) : null}
       </SectionCard>
 
-      {eventId ? (
-        <SectionCard title="Mover timeline" caption="Regenera horarios y conserva el estado de tareas existentes.">
-          <View style={styles.inlineActions}>
-            {[-10, 10, 15].map((minutes) => (
-              <PrimaryButton
-                key={minutes}
-                label={`${minutes > 0 ? "+" : ""}${minutes} min`}
-                icon={Clock}
-                variant="secondary"
-                loading={savingEvent}
-                onPress={() => void handleShift(minutes)}
-              />
-            ))}
-          </View>
-          <View style={styles.shiftManual}>
-            <Field
-              label="Minutos"
-              value={manualShiftMinutes}
-              onChangeText={setManualShiftMinutes}
-              keyboardType="numeric"
-            />
-            <PrimaryButton
-              label="Mover"
-              icon={Clock}
-              loading={savingEvent}
-              onPress={() => void handleShift(Number(manualShiftMinutes))}
-            />
-          </View>
-        </SectionCard>
-      ) : null}
-
-      {eventId ? (
-        <SectionCard title="Bloques operativos" caption="Completa todas las tareas activas de un bloque.">
-          {result.blocks.length > visibleBlocks.length ? (
-            <Text style={styles.empty}>Mostrando {visibleBlocks.length} de {result.blocks.length} bloques en movil.</Text>
-          ) : null}
-          {visibleBlocks.map((block) => {
-            const blockTasks = tasksByBlock.get(block.id) ?? [];
-            const activeTasks = blockTasks.filter((task) => task.status === "pending" || task.status === "in_progress");
-            return (
-              <View key={block.id} style={styles.blockRow}>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.title}>{block.label}</Text>
-                  <Text style={styles.meta}>
-                    {block.start}-{block.end} - minimo {block.requiredStaffMin ?? 0} - {activeTasks.length}/{blockTasks.length} activas
-                  </Text>
-                </View>
-                <PrimaryButton
-                  label="Completar bloque"
-                  icon={CheckCheck}
-                  variant="secondary"
-                  disabled={activeTasks.length === 0 || saving}
-                  loading={saving}
-                  onPress={() => void handleCompleteEventBlock(block.id)}
-                />
-              </View>
-            );
-          })}
-        </SectionCard>
-      ) : null}
-
-      {!metreOnly ? <SectionCard title="Camareros activos" caption={loading ? "Cargando empleados..." : undefined}>
+      <SectionCard title="Camareros activos" caption={loading ? "Cargando empleados..." : undefined}>
         {unassignedWaiters.length === 0 ? <Text style={styles.empty}>No hay camareros pendientes por asignar.</Text> : null}
         {unassignedWaiters.map((waiter) => (
           <View key={waiter.employeeId} style={styles.row}>
@@ -345,9 +247,9 @@ export function AdminPanelScreen({ navigation }: Props) {
             </View>
           </View>
         ))}
-      </SectionCard> : null}
+      </SectionCard>
 
-      {!metreOnly ? <SectionCard title="Equipo del evento">
+      <SectionCard title="Equipo del evento">
         {staff.length === 0 ? <Text style={styles.empty}>Aun no hay camareros asignados al evento.</Text> : null}
         {staff.map((assignment) => (
           <View key={assignment.id} style={styles.staffChip}>
@@ -357,9 +259,9 @@ export function AdminPanelScreen({ navigation }: Props) {
             </Text>
           </View>
         ))}
-      </SectionCard> : null}
+      </SectionCard>
 
-      {!metreOnly ? <SectionCard title="Asignar bloques">
+      <SectionCard title="Asignar bloques">
         {result.blocks.length > visibleBlocks.length ? (
           <Text style={styles.empty}>Mostrando {visibleBlocks.length} de {result.blocks.length} bloques.</Text>
         ) : null}
@@ -384,9 +286,9 @@ export function AdminPanelScreen({ navigation }: Props) {
             </View>
           </View>
         ))}
-      </SectionCard> : null}
+      </SectionCard>
 
-      {!metreOnly ? <SectionCard title="Tareas internas" caption="Puedes asignar una tarea puntual ademas del bloque.">
+      <SectionCard title="Tareas internas" caption="Puedes asignar una tarea puntual ademas del bloque.">
         {eventTasks.length === 0 ? <Text style={styles.empty}>Guarda el evento para generar tareas del catalogo.</Text> : null}
         {eventTasks.length > visibleEventTasks.length ? (
           <Text style={styles.empty}>Mostrando {visibleEventTasks.length} de {eventTasks.length} tareas para evitar sobrecargar el movil.</Text>
@@ -411,7 +313,7 @@ export function AdminPanelScreen({ navigation }: Props) {
             </View>
           </View>
         ))}
-      </SectionCard> : null}
+      </SectionCard>
     </Screen>
   );
 }
@@ -472,12 +374,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.line,
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingBottom: spacing.sm,
-  },
-  shiftManual: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
   },
   row: {
     alignItems: "center",

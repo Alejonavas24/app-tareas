@@ -56,6 +56,7 @@ function parseHoursToMinutes(value: string, fallbackMinutes?: number): number {
 export function ConfiguratorScreen({ navigation }: Props) {
   const {
     draft,
+    dbId,
     createDraft,
     updateDraft,
     regenerate,
@@ -138,6 +139,12 @@ export function ConfiguratorScreen({ navigation }: Props) {
             icon={Save}
             loading={saving}
             onPress={() => void handleSaveEvent()}
+          />
+          <PrimaryButton
+            label="Asignar camareros"
+            variant="secondary"
+            disabled={!dbId}
+            onPress={() => navigation.navigate("AdminPanel")}
           />
           <PrimaryButton
             label="Generar diagrama"

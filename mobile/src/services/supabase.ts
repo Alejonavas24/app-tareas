@@ -577,6 +577,27 @@ export async function assignEventBlock(eventId: string, blockKey: string, staffI
   }
 }
 
+export async function autoAssignEventBlocksForStaff(eventId: string, staffId: string): Promise<void> {
+  ensureEnv();
+  const { error } = await supabase.rpc("assign_event_blocks_for_staff", {
+    p_event_id: eventId,
+    p_staff_id: staffId,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function autoAssignEventBlocksForEvent(eventId: string): Promise<void> {
+  ensureEnv();
+  const { error } = await supabase.rpc("assign_event_blocks_for_event", {
+    p_event_id: eventId,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function assignEventTask(taskInstanceId: string, staffId: string): Promise<void> {
   ensureEnv();
   const { error } = await supabase.rpc("assign_event_task", {

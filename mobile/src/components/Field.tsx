@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { colors, radii, spacing } from "../theme/tokens";
 
@@ -8,6 +9,8 @@ interface FieldProps {
   placeholder?: string;
   keyboardType?: "default" | "numeric";
   multiline?: boolean;
+  required?: boolean;
+  errorMessage?: string;
 }
 
 export function Field({
@@ -17,19 +20,63 @@ export function Field({
   placeholder,
   keyboardType = "default",
   multiline,
+  required = true,
+  errorMessage = "Este campo es obligatorio.",
 }: FieldProps) {
+  const [localValue, setLocalValue] = useState(value);
+  const [focused, setFocused] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const [preserveEmpty, setPreserveEmpty] = useState(false);
+  const previousValueRef = useRef(value);
+  const isEmpty = required && localValue.trim().length === 0;
+  const showError = isEmpty && touched;
+
+  useEffect(() => {
+    const propChanged = previousValueRef.current !== value;
+    previousValueRef.current = value;
+
+    if (propChanged) {
+      setPreserveEmpty(false);
+      setLocalValue(value);
+      return;
+    }
+
+    if (!focused && !preserveEmpty) {
+      setLocalValue(value);
+    }
+  }, [focused, preserveEmpty, value]);
+
+  function handleChangeText(nextValue: string) {
+    setLocalValue(nextValue);
+    setTouched(true);
+
+    if (required && nextValue.trim().length === 0) {
+      setPreserveEmpty(true);
+      return;
+    }
+
+    setPreserveEmpty(false);
+    onChangeText(nextValue);
+  }
+
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
-        style={[styles.input, multiline && styles.multiline]}
-        value={value}
-        onChangeText={onChangeText}
+        style={[styles.input, multiline && styles.multiline, showError && styles.inputError]}
+        value={localValue}
+        onChangeText={handleChangeText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          setTouched(true);
+        }}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
         keyboardType={keyboardType}
         multiline={multiline}
       />
+      {showError ? <Text style={styles.error}>{errorMessage}</Text> : null}
     </View>
   );
 }
@@ -79,6 +126,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     backgroundColor: colors.white,
   },
+  inputError: {
+    borderColor: colors.danger,
+  },
+  error: {
+    color: colors.danger,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
   multiline: {
     minHeight: 96,
     textAlignVertical: "top",
@@ -106,4 +161,3 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
-
